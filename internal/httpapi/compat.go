@@ -301,6 +301,17 @@ func apnKeys() []string {
 }
 
 func (h *handler) apnAll(w http.ResponseWriter, r *http.Request) {
+	if ubus, ok := h.deps.Device.(device.UBUSDevice); ok {
+		auto, err1 := ubus.Call(r.Context(), "zwrt_apn_object", "getAutoApnList", map[string]any{})
+		manual, err2 := ubus.Call(r.Context(), "zwrt_apn_object", "getManuApnList", map[string]any{})
+		mode, err3 := ubus.Call(r.Context(), "zwrt_apn_object", "get_apn_mode", map[string]any{})
+		if err1 != nil || err2 != nil || err3 != nil {
+			writeJSON(w, http.StatusForbidden, envelope{Code: 403, Message: "APN access requires an authorized UBUS session"})
+			return
+		}
+		writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{"auto": auto, "manual": manual, "mode": mode}})
+		return
+	}
 	values, err := device.GetMany(r.Context(), h.deps.Device, apnKeys())
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "read APN data"})
@@ -327,6 +338,24 @@ func (h *handler) apnModeSet(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "mode must be auto/manual and index 0..19"})
 		return
 	}
+	if ubus, ok := h.deps.Device.(device.UBUSDevice); ok {
+		mode := 0
+		if request.Mode == "manual" {
+			mode = 1
+		}
+		if _, err := ubus.Call(r.Context(), "zwrt_apn_object", "set_apn_mode", map[string]any{"apn_mode": mode}); err != nil {
+			writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "set U60 APN mode"})
+			return
+		}
+		if mode == 1 {
+			if _, err := ubus.Call(r.Context(), "zwrt_apn_object", "enable_manu_apn_id", map[string]any{"profileId": request.Index}); err != nil {
+				writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "select U60 APN profile"})
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, envelope{Code: 0})
+		return
+	}
 	values := map[string]string{"goformId": "APN_PROC_EX", "apn_mode": request.Mode}
 	if request.Mode == "manual" {
 		values["apn_action"] = "set_default"
@@ -345,6 +374,27 @@ func (h *handler) apnSave(w http.ResponseWriter, r *http.Request) {
 	var request map[string]any
 	if err := decodeJSON(r, &request); err != nil {
 		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid APN profile"})
+		return
+	}
+	if ubus, ok := h.deps.Device.(device.UBUSDevice); ok {
+		if strings.Trim(toString(request["apn_ppp_passwd"]), `"`) != "" {
+			writeJSON(w, http.StatusUnprocessableEntity, envelope{Code: 422, Message: "encrypted U60 APN passwords must be configured in the official UI"})
+			return
+		}
+		params := map[string]any{
+			"profilename": toString(request["profile_name"]), "pdpType": toString(request["apn_pdp_type"]),
+			"wanapn": toString(request["apn_wan_apn"]), "pppAuthMode": toString(request["apn_ppp_auth_mode"]),
+			"username": toString(request["apn_ppp_username"]), "password": "",
+		}
+		procedure := "addManuApn"
+		if profile := strings.Trim(toString(request["profileId"]), `"`); profile != "" {
+			procedure, params["profileId"] = "modifyManuApn", profile
+		}
+		if _, err := ubus.Call(r.Context(), "zwrt_apn_object", procedure, params); err != nil {
+			writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "save U60 APN profile"})
+			return
+		}
+		writeJSON(w, http.StatusOK, envelope{Code: 0})
 		return
 	}
 	values := map[string]string{"goformId": "APN_PROC_EX", "apn_mode": "manual", "apn_action": "save"}
@@ -368,6 +418,14 @@ func (h *handler) apnDelete(w http.ResponseWriter, r *http.Request) {
 	index, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil || index < 0 || index > 19 {
 		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "APN index must be 0..19"})
+		return
+	}
+	if ubus, ok := h.deps.Device.(device.UBUSDevice); ok {
+		if _, err := ubus.Call(r.Context(), "zwrt_apn_object", "delete_manu_apn", map[string]any{"profileId": index}); err != nil {
+			writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "delete U60 APN profile"})
+			return
+		}
+		writeJSON(w, http.StatusOK, envelope{Code: 0})
 		return
 	}
 	err = device.Command(r.Context(), h.deps.Device, map[string]string{

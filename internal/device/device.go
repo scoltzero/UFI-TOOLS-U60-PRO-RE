@@ -40,6 +40,10 @@ type GoFormResultDevice interface {
 	GoFormCommandResult(context.Context, map[string]string) (map[string]any, error)
 }
 
+type UBUSDevice interface {
+	Call(context.Context, string, string, map[string]any) (map[string]any, error)
+}
+
 // Simulator is deterministic and never touches ADB, the LAN, or the host shell.
 type Simulator struct {
 	mu      sync.RWMutex

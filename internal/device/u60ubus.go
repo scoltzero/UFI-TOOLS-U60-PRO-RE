@@ -69,7 +69,7 @@ func (u *U60UBUS) GoFormGet(ctx context.Context, key string) (string, error) {
 func (u *U60UBUS) GoFormSet(context.Context, string, string) error { return ErrUnsupported }
 func (u *U60UBUS) GoFormGetMany(ctx context.Context, keys []string) (map[string]string, error) {
 	merged := map[string]any{}
-	for _, c := range [][2]string{{"zwrt_mc.device.manager", "get_device_info"}, {"zte_nwinfo_api", "nwinfo_get_netinfo"}, {"zwrt_zte_mdm.api", "get_sim_info_before"}, {"zwrt_router.api", "router_get_status_no_auth"}} {
+	for _, c := range [][2]string{{"zwrt_mc.device.manager", "get_device_info"}, {"zte_nwinfo_api", "nwinfo_get_netinfo"}, {"zwrt_zte_mdm.api", "get_sim_info_before"}, {"zwrt_router.api", "router_get_status_no_auth"}, {"zwrt_wlan", "report"}} {
 		v, e := u.call(ctx, c[0], c[1], map[string]any{})
 		if e != nil {
 			return nil, fmt.Errorf("U60 %s.%s: %w", c[0], c[1], e)
@@ -78,7 +78,7 @@ func (u *U60UBUS) GoFormGetMany(ctx context.Context, keys []string) (map[string]
 			merged[k] = x
 		}
 	}
-	aliases := map[string]string{"imei": "modem_imei", "hw_version": "wa_version", "signal": "signalbar", "model": "wa_inner_version"}
+	aliases := map[string]string{"imei": "modem_imei", "hw_version": "wa_version", "signal": "signalbar", "model": "wa_inner_version", "SSID1": "main2g_ssid", "wifi_ssid": "main2g_ssid", "AuthMode": "main2g_authmode"}
 	out := make(map[string]string, len(keys))
 	for _, k := range keys {
 		s := k
