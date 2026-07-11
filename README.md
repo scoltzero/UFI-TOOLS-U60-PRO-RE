@@ -5,8 +5,9 @@ The project combines reusable MIT-licensed concepts from the upstream
 [kanoqwq/UFI-TOOLS](https://github.com/kanoqwq/UFI-TOOLS) project with a
 clean-room reimplementation of device-specific observable behavior.
 
-> Status: active clean-room implementation. It is not ready for installation
-> on a device. Development and tests currently run without touching a U60 Pro.
+> Status: implementation-complete pre-device-validation release candidate.
+> Development and tests intentionally run without touching a U60 Pro; physical
+> installation remains a separate authorization and validation gate.
 
 ## Goals
 
@@ -48,6 +49,11 @@ generates a token in `tmp/data/device-token`; enter that token in the web UI.
 Build the target binaries with `make build-arm64`. Installation is documented
 under `installer/`; its ADB transport is dry-run-only unless `--execute` is
 explicitly supplied.
+
+The web dashboard exposes device status, ADB/ttyd controls, hosts management,
+verified plugins, scheduling and SMS-forwarding configuration. The backend also
+implements the observed legacy API surface for upstream frontend/plugin
+compatibility.
 
 ## License
 
