@@ -78,6 +78,38 @@ func TestEmbeddedUpstreamAndRecoveryFrontends(t *testing.T) {
 	}
 }
 
+func TestUpstreamFrontendResponseShapes(t *testing.T) {
+	router := testRouter(t, "")
+	for _, test := range []struct {
+		method   string
+		path     string
+		body     string
+		contains []string
+	}{
+		{http.MethodGet, "/api/version_info", "", []string{`"app_ver":"test"`, `"model":"U60 Pro (simulated)"`}},
+		{http.MethodGet, "/api/baseDeviceInfo", "", []string{`"network_type":"5G"`, `"app_ver":"test"`}},
+		{http.MethodGet, "/api/goform/goform_get_cmd_process?cmd=network_type,signal&multi_data=1", "", []string{`"network_type":"5G"`, `"signal":"75"`}},
+		{http.MethodPost, "/api/goform/goform_set_cmd_process", `{"goformId":"TEST","value":"ok"}`, []string{`"result":"success"`}},
+		{http.MethodGet, "/api/get_theme", "", []string{`"backgroundEnabled":"false"`}},
+		{http.MethodGet, "/api/is_weak_token", "", []string{`"is_weak_token":true`}},
+	} {
+		recorder := httptest.NewRecorder()
+		req := httptest.NewRequest(test.method, test.path, strings.NewReader(test.body))
+		if test.body != "" {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		router.ServeHTTP(recorder, req)
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("%s %s: %d %s", test.method, test.path, recorder.Code, recorder.Body.String())
+		}
+		for _, expected := range test.contains {
+			if !strings.Contains(recorder.Body.String(), expected) {
+				t.Errorf("%s %s missing %s: %s", test.method, test.path, expected, recorder.Body.String())
+			}
+		}
+	}
+}
+
 func TestConfigPersistenceAndShellDefault(t *testing.T) {
 	router := testRouter(t, "")
 
