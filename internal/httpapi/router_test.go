@@ -157,6 +157,38 @@ func TestLegacySpeedtestByteContract(t *testing.T) {
 	}
 }
 
+func TestLegacySMSSettingShapes(t *testing.T) {
+	router := testRouter(t, "")
+	requests := []struct {
+		path string
+		body string
+	}{
+		{"/api/sms_forward_enabled", `{"enabled":true}`},
+		{"/api/sms_forward_method", `{"method":"CURL"}`},
+		{"/api/sms_forward_blacklist", `{"phone":"10086","keywords":"spam"}`},
+		{"/api/sms_forward_curl", `{"curl_text":"https://example.invalid/{{sms-body}}"}`},
+	}
+	for _, request := range requests {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, request.path, strings.NewReader(request.body)))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("POST %s: %d %s", request.path, recorder.Code, recorder.Body.String())
+		}
+	}
+	for _, expected := range []struct{ path, value string }{
+		{"/api/sms_forward_enabled", `"enabled":"1"`},
+		{"/api/sms_forward_method", `"sms_forward_method":"CURL"`},
+		{"/api/sms_forward_blacklist", `"keywords":"spam"`},
+		{"/api/sms_forward_curl", `"curl_text":"https://example.invalid/{{sms-body}}"`},
+	} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, expected.path, nil))
+		if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), expected.value) {
+			t.Fatalf("GET %s: %d %s", expected.path, recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
 func TestConfigPersistenceAndShellDefault(t *testing.T) {
 	router := testRouter(t, "")
 
@@ -232,7 +264,11 @@ func TestObservedCompatibilityPathsAreRegistered(t *testing.T) {
 		"/api/sms_forward_method", "/api/sms_forward_sms", "/api/speedtest", "/api/time/config",
 		"/api/time/status", "/api/time/sync", "/api/ttyd/start", "/api/ttyd/status", "/api/ttyd/stop",
 		"/api/update_admin_pwd", "/api/upload_file", "/api/upload_img", "/api/uploads/test",
-		"/api/usb_status", "/api/version_info", "/api/wifi/qrcode",
+		"/api/usb_status", "/api/version_info", "/api/wifi/qrcode", "/api/AT", "/api/volte_status",
+		"/api/vonr_status", "/api/get_cookie", "/api/set_cookie", "/api/get_data_limit",
+		"/api/set_data_limit", "/api/root_shell", "/api/user_shell", "/api/one_click_shell",
+		"/api/smbPath", "/api/disable_fota", "/api/download_apk", "/api/download_apk_status",
+		"/api/install_apk", "/api/do_forward_msg",
 	}
 	for _, path := range paths {
 		recorder := httptest.NewRecorder()

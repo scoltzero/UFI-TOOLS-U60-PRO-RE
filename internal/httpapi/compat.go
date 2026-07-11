@@ -79,6 +79,14 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/set_cookie", h.legacySetCookie)
 	mux.HandleFunc("GET /api/get_data_limit", h.legacyGetDataLimit)
 	mux.HandleFunc("POST /api/set_data_limit", h.legacySetDataLimit)
+	mux.HandleFunc("POST /api/root_shell", h.legacyShell)
+	mux.HandleFunc("POST /api/user_shell", h.legacyShell)
+	mux.HandleFunc("GET /api/one_click_shell", h.legacyOneClickShell)
+	mux.HandleFunc("GET /api/smbPath", h.legacySMBPath)
+	mux.HandleFunc("GET /api/disable_fota", h.legacyDisableFOTA)
+	mux.HandleFunc("POST /api/download_apk", h.unsupportedAPK)
+	mux.HandleFunc("GET /api/download_apk_status", h.unsupportedAPKStatus)
+	mux.HandleFunc("POST /api/install_apk", h.unsupportedAPK)
 	mux.HandleFunc("POST /api/set_wakelock_status", h.setWakelock)
 	mux.HandleFunc("GET /api/wifi/qrcode", h.wifiQRCodeData)
 	mux.HandleFunc("GET /api/speedtest", h.legacySpeedtest)
@@ -101,15 +109,23 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/apn/cid", h.apnCID)
 	mux.HandleFunc("GET /api/apn/manual/enabled", h.apnEnabled)
 	mux.HandleFunc("POST /api/apn/manual/enable", h.apnEnable)
+	mux.HandleFunc("GET /api/sms_forward_enabled", h.legacySMSGet("enabled"))
+	mux.HandleFunc("POST /api/sms_forward_enabled", h.legacySMSSet("enabled"))
+	mux.HandleFunc("GET /api/sms_forward_method", h.legacySMSGet("method"))
+	mux.HandleFunc("POST /api/sms_forward_method", h.legacySMSSet("method"))
+	mux.HandleFunc("GET /api/sms_forward_blacklist", h.legacySMSGet("blacklist"))
+	mux.HandleFunc("POST /api/sms_forward_blacklist", h.legacySMSSet("blacklist"))
+	mux.HandleFunc("GET /api/sms_forward_curl", h.legacySMSGet("curl"))
+	mux.HandleFunc("POST /api/sms_forward_curl", h.legacySMSSet("curl"))
+	mux.HandleFunc("GET /api/sms_forward_dingtalk", h.legacySMSGet("dingtalk"))
+	mux.HandleFunc("POST /api/sms_forward_dingtalk", h.legacySMSSet("dingtalk"))
+	mux.HandleFunc("GET /api/sms_forward_mail", h.legacySMSGet("mail"))
+	mux.HandleFunc("POST /api/sms_forward_mail", h.legacySMSSet("mail"))
+	mux.HandleFunc("GET /api/power_status_forward_enabled", h.legacyPowerForwardGet)
+	mux.HandleFunc("POST /api/power_status_forward_enabled", h.legacyPowerForwardSet)
+	mux.HandleFunc("POST /api/do_forward_msg", h.legacyDoForwardMessage)
 
 	for _, route := range []struct{ path, key, fallback string }{
-		{"/api/sms_forward_enabled", "sms_forward_enabled", "false"},
-		{"/api/sms_forward_method", "sms_forward_method", "sms"},
-		{"/api/sms_forward_blacklist", "sms_forward_blacklist", "[]"},
-		{"/api/sms_forward_curl", "sms_forward_curl", "{}"},
-		{"/api/sms_forward_dingtalk", "sms_forward_dingtalk", "{}"},
-		{"/api/sms_forward_mail", "sms_forward_mail", "{}"},
-		{"/api/power_status_forward_enabled", "power_status_forward_enabled", "false"},
 		{"/api/time/config", "time_config", `{"enabled":false}`},
 		{"/api/auto_update/config", "auto_update_config", `{"enabled":false}`},
 	} {

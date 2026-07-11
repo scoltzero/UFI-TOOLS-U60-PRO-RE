@@ -119,6 +119,12 @@ func (m *Manager) Tick(ctx context.Context) error {
 	return nil
 }
 
+// Forward sends one caller-supplied message through the configured forwarding
+// method. It is used by the authenticated legacy test/forward endpoint.
+func (m *Manager) Forward(ctx context.Context, message Message) error {
+	return m.forward(ctx, message)
+}
+
 func (m *Manager) list(ctx context.Context) ([]Message, error) {
 	response, err := device.CommandResult(ctx, m.device, map[string]string{
 		"goformId": "zwrt_wms", "func": "zte_libwms_get_sms_data", "tags": "10",
@@ -379,8 +385,9 @@ func parseBool(value string) bool {
 	var object map[string]any
 	if json.Unmarshal([]byte(value), &object) == nil {
 		for _, key := range []string{"enabled", "enable", "value"} {
-			if candidate, ok := object[key].(bool); ok {
-				return candidate
+			if candidate, ok := object[key]; ok {
+				text := strings.ToLower(strings.TrimSpace(toString(candidate)))
+				return text == "1" || text == "true" || text == "on"
 			}
 		}
 	}
