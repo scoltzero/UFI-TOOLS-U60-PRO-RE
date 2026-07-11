@@ -30,6 +30,7 @@ type Config struct {
 	LegacyAuthEnabled  bool
 	LegacyShellEnabled bool
 	PluginServerURL    string
+	PluginServerToken  string
 	ResourceServerURL  string
 	SignClockSkew      time.Duration
 	DeviceBackend      string
@@ -52,6 +53,7 @@ func Load() (Config, error) {
 	flags.BoolVar(&cfg.LegacyAuthEnabled, "legacy-auth", envBool("UFI_LEGACY_AUTH", cfg.LegacyAuthEnabled), "enable legacy authentication compatibility")
 	flags.BoolVar(&cfg.LegacyShellEnabled, "legacy-shell", envBool("UFI_LEGACY_SHELL", cfg.LegacyShellEnabled), "enable legacy shell endpoint")
 	flags.StringVar(&cfg.PluginServerURL, "plugin-server-url", envString("UFI_PLUGIN_SERVER_URL", cfg.PluginServerURL), "optional plugin catalog base URL")
+	flags.StringVar(&cfg.PluginServerToken, "plugin-server-token", envString("UFI_PLUGIN_SERVER_TOKEN", cfg.PluginServerToken), "optional plugin catalog token")
 	flags.StringVar(&cfg.ResourceServerURL, "resource-server-url", envString("UFI_RESOURCE_SERVER_URL", cfg.ResourceServerURL), "optional resource base URL")
 	flags.StringVar(&cfg.DeviceBackend, "device-backend", envString("UFI_DEVICE_BACKEND", cfg.DeviceBackend), "simulator or zte-http")
 	flags.StringVar(&cfg.DeviceBaseURL, "device-base-url", envString("UFI_DEVICE_BASE_URL", cfg.DeviceBaseURL), "ZTE device HTTP origin")
@@ -118,6 +120,19 @@ func (c Config) Validate() error {
 	}
 	if c.LegacyShellEnabled && !c.LegacyAuthEnabled {
 		return errors.New("legacy shell requires legacy authentication")
+	}
+	if c.PluginServerURL != "" {
+		pluginURL, err := url.Parse(c.PluginServerURL)
+		if err != nil || pluginURL.Host == "" || (pluginURL.Scheme != "http" && pluginURL.Scheme != "https") {
+			return errors.New("plugin server URL must be an HTTP(S) origin")
+		}
+		if pluginURL.Scheme == "http" {
+			host := pluginURL.Hostname()
+			ip := net.ParseIP(host)
+			if !strings.EqualFold(host, "localhost") && (ip == nil || !(ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast())) {
+				return errors.New("plain HTTP plugin server must use a private, loopback, or link-local address")
+			}
+		}
 	}
 	if c.DeviceHTTPTimeout <= 0 || c.DeviceHTTPTimeout > time.Minute {
 		return errors.New("device HTTP timeout must be between zero and one minute")

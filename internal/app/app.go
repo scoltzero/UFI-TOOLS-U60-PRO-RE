@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/catalog"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/httpapi"
@@ -52,11 +53,19 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 		db.Close()
 		return nil, err
 	}
+	var catalogClient *catalog.Client
+	if cfg.PluginServerURL != "" {
+		catalogClient, err = catalog.NewClient(cfg.PluginServerURL, cfg.PluginServerToken, &http.Client{Timeout: 10 * time.Second})
+		if err != nil {
+			db.Close()
+			return nil, fmt.Errorf("configure plugin catalog: %w", err)
+		}
+	}
 
 	app.server = &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.New(httpapi.Dependencies{
-			Config: cfg, Store: db, Device: deviceBackend, Logger: app.logger, Version: app.version,
+			Config: cfg, Store: db, Device: deviceBackend, Logger: app.logger, Version: app.version, Catalog: catalogClient,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

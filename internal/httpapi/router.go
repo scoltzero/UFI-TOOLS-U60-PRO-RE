@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/catalog"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/plugins"
@@ -28,6 +29,7 @@ type Dependencies struct {
 	Device  device.Device
 	Logger  *slog.Logger
 	Version string
+	Catalog *catalog.Client
 }
 
 type handler struct {
@@ -60,6 +62,7 @@ func New(deps Dependencies) http.Handler {
 	protected.HandleFunc("GET /api/plugins/custom_head", h.getCustomHead)
 	protected.HandleFunc("POST /api/plugins/custom_head", h.setCustomHead)
 	protected.HandleFunc("GET /api/store/plugins", h.localCatalog)
+	protected.HandleFunc("POST /api/store/plugins/{id}/install", h.installCatalogPlugin)
 	protected.HandleFunc("GET /api/hosts", h.getHosts)
 	protected.HandleFunc("POST /api/hosts", h.setHosts)
 	protected.HandleFunc("POST /api/hosts/restore", h.restoreHosts)
@@ -232,10 +235,37 @@ func (h *handler) setCustomHead(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: doc})
 }
 
-func (h *handler) localCatalog(w http.ResponseWriter, _ *http.Request) {
+func (h *handler) localCatalog(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Catalog != nil {
+		items, err := h.deps.Catalog.List(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "plugin catalog unavailable"})
+			return
+		}
+		writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{"source": "configured", "plugins": items}})
+		return
+	}
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{
 		"source": "local", "plugins": []any{}, "remote_configured": h.deps.Config.PluginServerURL != "",
 	}})
+}
+
+func (h *handler) installCatalogPlugin(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Catalog == nil {
+		writeJSON(w, http.StatusConflict, envelope{Code: 409, Message: "no plugin catalog configured"})
+		return
+	}
+	item, data, err := h.deps.Catalog.Download(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "plugin download or integrity check failed"})
+		return
+	}
+	key := "plugin." + item.ID
+	if err := h.deps.Store.Set(r.Context(), "kv", key, string(data)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save plugin"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: item})
 }
 
 func (h *handler) getHosts(w http.ResponseWriter, r *http.Request) {
