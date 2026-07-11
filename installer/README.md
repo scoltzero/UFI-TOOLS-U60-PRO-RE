@@ -18,7 +18,13 @@ matching rollback container, and health-verified automatic rollback. Its
 encryption and archive format have been calibrated against an authorized
 real-device backup. CLI, Windows, and Android installers implement the official
 salted router-password login and authenticated `webtoken` upload flow;
-destructive restore acceptance is the remaining gate.
+destructive restore acceptance is intentionally deferred. Rollback support
+reduces installation risk but cannot guarantee recovery from power loss,
+firmware-specific restore side effects, or a device that no longer boots.
+When the router password is supplied, the shared installer client keeps it only
+in process memory and re-authenticates before a rollback upload because Web/UBUS
+sessions may be invalidated by reboot. A manually supplied UBUS session cannot
+be renewed automatically and may therefore be unsuitable for recovery testing.
 
 Build and preview the LAN transport with:
 

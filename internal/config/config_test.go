@@ -9,7 +9,7 @@ func TestDefaultsAreSafe(t *testing.T) {
 	if cfg.LegacyAuthEnabled || cfg.LegacyShellEnabled {
 		t.Fatal("legacy compatibility must default to disabled")
 	}
-	if cfg.PluginServerURL != "" || cfg.ResourceServerURL != "" {
+	if cfg.PluginServerURL != "" || cfg.ResourceServerURL != "" || cfg.UpdateManifestURL != "" || cfg.DeviceBaseURL != "" {
 		t.Fatal("fresh installs must not contact an external control plane")
 	}
 	if err := cfg.Validate(); err != nil {

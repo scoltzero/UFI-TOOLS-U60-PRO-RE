@@ -41,6 +41,7 @@ func (c *Client) Install(ctx context.Context, options InstallOptions) (InstallRe
 	if !options.Execute {
 		return result, nil
 	}
+	defer func() { c.password = "" }()
 	if !options.Acknowledged {
 		return result, errors.New("device restore acknowledgement is required")
 	}
@@ -76,7 +77,12 @@ func (c *Client) Install(ctx context.Context, options InstallOptions) (InstallRe
 	result.RollbackAttempted = true
 	rollbackCtx, cancel := context.WithTimeout(context.Background(), options.HealthTimeout)
 	defer cancel()
-	if err := retry(rollbackCtx, options.RetryInterval, func() error { return c.Upload(rollbackCtx, rollback) }); err != nil {
+	if err := retry(rollbackCtx, options.RetryInterval, func() error {
+		if err := c.reauthenticate(rollbackCtx); err != nil {
+			return err
+		}
+		return c.Upload(rollbackCtx, rollback)
+	}); err != nil {
 		return result, fmt.Errorf("candidate health failed and rollback upload failed: %w", err)
 	}
 	if err := retry(rollbackCtx, options.RetryInterval, func() error { return c.Restore(rollbackCtx) }); err != nil {

@@ -23,8 +23,9 @@ Coverage is tracked by behavior rather than private implementation details.
 | APN/cellular controls | Implemented | GoForm plus U60 UBUS list/save/delete/select; encrypted APN passwords stay in official UI |
 | ADB/ttyd lifecycle | Implemented | Fixed ADB commands and PID/log-supervised ttyd process |
 | OTA | Implemented | Same-origin fetch, Ed25519, size/SHA-256, staging and transactional install |
-| LAN restore installer | Format calibrated; transaction implemented | Real backup decrypt/inspect, official upload/RPC, restart health proof, mandatory matching rollback container and rollback health proof; destructive restore untested |
+| LAN restore installer | Format calibrated; transaction implemented | Real backup decrypt/inspect, official upload/RPC, restart health proof, mandatory matching rollback container and rollback health proof; destructive restore intentionally deferred |
 
 “Simulated” means route behavior can be developed and tested without accessing
 a U60 Pro. The U60 adapter and backup parser have also been validated against
-the authorized physical device; restore execution remains separately unclaimed.
+authorized read-only physical-device evidence. Restore execution is outside the
+current non-release, no-device-mutation scope and remains unclaimed.

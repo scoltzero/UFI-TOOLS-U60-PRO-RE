@@ -25,9 +25,10 @@ const (
 )
 
 type Client struct {
-	base    *url.URL
-	session string
-	http    *http.Client
+	base     *url.URL
+	session  string
+	password string
+	http     *http.Client
 }
 
 func NewClient(baseURL, session string, client *http.Client) (*Client, error) {
@@ -81,7 +82,15 @@ func (c *Client) Login(ctx context.Context, password string) error {
 		return errors.New("router login returned an invalid session")
 	}
 	c.session = session
+	c.password = password
 	return nil
+}
+
+func (c *Client) reauthenticate(ctx context.Context) error {
+	if c.password == "" {
+		return nil
+	}
+	return c.Login(ctx, c.password)
 }
 
 func sha256UpperHex(value string) string {

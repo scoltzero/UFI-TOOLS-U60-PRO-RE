@@ -32,10 +32,10 @@ public final class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL); root.setPadding(32, 32, 32, 32);
         TextView title = text("U60 Pro 开源安装器", 24); root.addView(title);
-        root.addView(text("默认只预览。执行必须选择能恢复当前服务与 rc.local 的回滚容器。", 15));
+        root.addView(text("默认只预览。执行必须选择能恢复当前服务与 rc.local 的回滚容器；它不是完整系统镜像，不能保证救砖。", 15));
         base = field("http://192.168.98.1"); add(root, "设备管理地址", base);
         routerPassword = field(""); routerPassword.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); add(root, "路由器 Web 密码（推荐；不保存）", routerPassword);
-        session = field(""); add(root, "已有 UBUS 会话（与密码二选一）", session);
+        session = field(""); session.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); add(root, "已有 UBUS 会话（与密码二选一，不保存）", session);
         Button choose = new Button(this); choose.setText(R.string.choose_container); choose.setOnClickListener(v -> pick()); root.addView(choose);
         selected = text("尚未选择文件", 14); root.addView(selected);
         Button chooseOriginal = new Button(this); chooseOriginal.setText(R.string.choose_rollback); chooseOriginal.setOnClickListener(v -> pick(PICK_ORIGINAL)); root.addView(chooseOriginal);
@@ -75,6 +75,7 @@ public final class MainActivity extends Activity {
                 byte[] rollback = read(rollbackContainer, 128 << 20); write(backup, rollback);
                 installer.upload(candidate); installer.restore();
                 if (installer.waitRestart()) { show("安装成功\n回滚容器副本: " + backup.getAbsolutePath()); return; }
+                if (!targetPassword.isEmpty()) installer.retryLogin(targetPassword);
                 installer.retryUpload(rollback); installer.retryRestore();
                 if (!installer.waitRestart()) throw new IOException("回滚已触发，但服务未恢复健康");
                 show("候选服务未恢复健康；回滚后服务已恢复\n备份: " + backup.getAbsolutePath());
@@ -132,6 +133,7 @@ public final class MainActivity extends Activity {
         boolean health() { try { request("GET", ":2333/healthz", null, null, 4096); return true; } catch(Exception e){ return false; } }
         void retryUpload(byte[] data) throws Exception { retry(() -> upload(data)); }
         void retryRestore() throws Exception { retry(this::restore); }
+        void retryLogin(String password) throws Exception { retry(() -> login(password)); }
         void retry(Action action) throws Exception { Exception last=null; for(int i=0;i<20;i++){try{action.run();return;}catch(Exception e){last=e;Thread.sleep(3000);}}throw last; }
         byte[] request(String method, String path, byte[] body, String contentType, int max) throws Exception {
             URL target = path.startsWith(":") ? new URL(origin.replaceFirst("(:\\d+)?$", path.substring(0, path.indexOf('/'))) + path.substring(path.indexOf('/'))) : new URL(origin + path);

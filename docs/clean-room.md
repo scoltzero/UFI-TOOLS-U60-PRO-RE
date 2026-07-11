@@ -20,8 +20,9 @@
 
 Code authors implement behavior from a written compatibility specification and
 tests. Research notes distinguish observed fact, inference, and new design.
-Every imported open-source file carries its original license notice. The Git
-history should make provenance review possible.
+Every imported open-source component carries its original license notice in the
+file or an adjacent directory-level attribution file. The Git history should
+make provenance review possible.
 
 ## Security divergence
 
@@ -29,4 +30,3 @@ Compatibility does not require reproducing harmful control-plane behavior.
 The open implementation must not include an external blacklist, remote stop
 switch, undisclosed telemetry, or unsigned self-update. Any optional remote
 service is explicit, documented, and disableable.
-

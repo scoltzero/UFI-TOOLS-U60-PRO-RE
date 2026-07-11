@@ -1,4 +1,4 @@
-.PHONY: test lint vuln build build-arm64 build-installers installer-test
+.PHONY: test lint vuln build build-arm64 build-installers android-check installer-test license-test
 
 test:
 	go list -e ./... | rg -v '/third_party/' | xargs go test
@@ -23,5 +23,11 @@ build-installers:
 	GOOS=windows GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags "-s -w" -o bin/install-lan-windows-amd64.exe ./cmd/install-lan
 	GOOS=windows GOARCH=amd64 go build -buildvcs=false -trimpath -ldflags "-s -w -H windowsgui" -o bin/UFI-TOOLS-U60-Pro-Installer.exe ./cmd/installer-ui
 
+android-check:
+	cd installer/android && ./gradlew --no-daemon :app:lintDebug :app:assembleDebug
+
 installer-test:
 	./installer/test-transaction.sh
+
+license-test:
+	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT HUP INT TERM; ./scripts/collect-licenses.sh "$$tmp"; test -s "$$tmp/modules.tsv"

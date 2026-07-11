@@ -41,19 +41,3 @@ if ('serviceWorker' in navigator) {
 } else {
   console.warn('当前浏览器不支持ServiceWorker');
 }
-
-
-// window.addEventListener('load', () => {
-//   const div = document.createElement('div');
-//   const iframe = document.createElement('iframe');
-//   iframe.src = 'https://i.kano.ink';
-//   iframe.width = "100%"
-//   iframe.style.height = "400px"
-//   iframe.frameBorder = "0"
-//   iframe.allow = "clipboard-write; camera; microphone; fullscreen; autoplay; encrypted-media";
-//   iframe.allowFullscreen = true;
-//   iframe.style.border = "none";
-//   div.style.width = "100%"
-//   div.appendChild(iframe);
-//   document.querySelector('.container').insertBefore(div, document.querySelector('#collapseBtn_menu'));
-// })

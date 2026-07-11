@@ -26,7 +26,7 @@ func main() {
 	session := flag.String("ubus-session", "", "optional 32-character UBUS session")
 	routerPasswordFile := flag.String("router-password-file", "", "file containing the router web password; logs in without exposing it in argv")
 	healthURL := flag.String("health-url", "", "candidate health URL (defaults to U60 host on port 2333)")
-	execute := flag.Bool("execute", false, "perform backup, upload, and restore")
+	execute := flag.Bool("execute", false, "save the supplied rollback copy, upload the candidate, and trigger restore")
 	ack := flag.Bool("acknowledge-device-restore", false, "acknowledge that restore reboots and mutates the device")
 	healthTimeout := flag.Duration("health-timeout", 5*time.Minute, "candidate/rollback health window")
 	flag.Parse()

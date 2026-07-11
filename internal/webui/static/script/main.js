@@ -574,7 +574,6 @@ function main_func() {
             localStorage.setItem('kano_sms_token', SHA256(token.trim()).toLowerCase())
             closeModal('#tokenModal')
             initRenderMethod()
-            initMessage()
             //记住密码
             const loginRememberMe = document.querySelector('#loginRememberMe')
             if (loginRememberMe && loginRememberMe.checked) {
@@ -4902,7 +4901,7 @@ function main_func() {
         const list = TTYD.querySelector('.deviceList')
         list.innerHTML = `
         <li style = "padding:10px">
-                    <iframe src="https://cg.163.com/#/mobile" style="border:none;padding:0;margin:0;width:100%;height:600px;border-radius: 10px;overflow: hidden;opacity: 1;"></iframe>
+                    <p>离线开源版本不加载第三方彩蛋页面。</p>
         </li > `
     }
 
@@ -6749,65 +6748,6 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
         }
     }
     initCheckWeakToken()
-
-    // 获取消息
-    const initMessage = async () => {
-        if (!(await initRequestData())) {
-            return null
-        }
-        try {
-            const api = 'https://api.kanokano.cn/ufi_tools_report'
-            const { device_id: uuid } = await (await fetch(`${KANO_baseURL}/device_id`, {
-                headers: common_headers
-            })).json()
-            if (uuid) {
-                const { message, has_read_message } = await (await fetch(`${KANO_baseURL}/proxy/--${api}/get_message/${uuid}`, {
-                    headers: common_headers
-                })).json()
-                if (has_read_message == true || has_read_message == "true") return
-                const { text } = parseDOM(message) //过滤掉远程任何的script脚本，防止远程任意代码自动执行
-                const { el, close } = createFixedToast('kano_message', `
-                    <div style="pointer-events:all;width:80vw;max-width:300px">
-                        <div class="title" style="margin:0" data-i18n="system_notice">${t('system_notice')}</div>
-                        <div style="margin:10px 0" id="kano_message_inner">${text}</div>
-                        <div style="text-align:right">
-                            <button style="font-size:.64rem" id="close_message_btn" data-i18n="pay_btn_dismiss">${t('pay_btn_dismiss')}</button>
-                        </div>
-                    </div>
-                    `)
-                const btn = el.querySelector('#close_message_btn')
-                if (!btn) {
-                    close()
-                    return
-                }
-                btn.onclick = async () => {
-                    try {
-                        const { has_read_message } = await (await fetch(`${KANO_baseURL}/proxy/--${api}/set_read_message/${uuid}`, {
-                            method: 'post',
-                            headers: common_headers
-                        })).json()
-                        if (has_read_message) {
-                            close()
-                        }
-                    } catch {
-                        try {
-                            const { has_read_message } = await (await fetch(`${api}/set_read_message/${uuid}`, {
-                                method: 'post'
-                            })).json()
-                            if (has_read_message) {
-                                close()
-                            }
-                        } catch { }
-                    } finally {
-                        close()
-                    }
-                }
-            }
-        } catch { }
-    }
-    // The open replacement does not contact the upstream device-reporting or
-    // notification service. Administrators can deploy the local notification
-    // backend instead; no device identifier leaves the U60 by default.
 
     const togglePort = async (port, flag, isBootup = false, v6 = false) => {
         try {

@@ -5,16 +5,18 @@ The project combines reusable MIT-licensed concepts from the upstream
 [kanoqwq/UFI-TOOLS](https://github.com/kanoqwq/UFI-TOOLS) project with a
 clean-room reimplementation of device-specific observable behavior.
 
-> Status: implementation-complete candidate with real-device read-only and
-> backup-format calibration. Destructive installation/reboot/rollback
-> validation remains an explicit authorized-device gate.
+> Status: implementation-complete offline candidate with real-device read-only
+> observations and backup-format calibration. Per the owner's current scope,
+> destructive installation, reboot, and rollback validation are deferred and
+> are not required for this non-release deliverable.
 
 ## Goals
 
 - Run as a static Linux/ARM64 service with an embedded web interface.
 - Preserve useful legacy API and plugin compatibility where practical.
 - Support a self-hosted plugin store and independently signed updates.
-- Provide reproducible ADB and LAN-backup installers with safe rollback.
+- Provide reproducible ADB and LAN-backup installers with transactional,
+  health-checked rollback support.
 - Remove opaque telemetry, remote blacklist/kill-switch behavior, and reliance
   on a third-party control plane.
 

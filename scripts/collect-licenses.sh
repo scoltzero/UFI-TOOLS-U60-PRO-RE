@@ -7,8 +7,11 @@ mkdir -p "$OUT"
 INDEX=$OUT/modules.tsv
 : > "$INDEX"
 
+set -- $(go list -e ./... | grep -v '/third_party/')
+[ "$#" -gt 0 ] || { echo "no project packages found" >&2; exit 1; }
+
 GOFLAGS=-buildvcs=false go list -deps \
-  -f '{{with .Module}}{{if not .Main}}{{.Path}}|{{.Version}}|{{.Dir}}{{end}}{{end}}' ./... |
+  -f '{{with .Module}}{{if not .Main}}{{.Path}}|{{.Version}}|{{.Dir}}{{end}}{{end}}' "$@" |
   sort -u |
   while IFS='|' read -r module version directory; do
     [ -n "$module" ] || continue
@@ -19,4 +22,3 @@ GOFLAGS=-buildvcs=false go list -deps \
     cp "$license" "$OUT/$target"
     printf '%s\t%s\t%s\n' "$module" "$version" "$target" >> "$INDEX"
   done
-

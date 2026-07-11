@@ -24,6 +24,7 @@ Initialize the pinned source for auditing with:
 ./scripts/fetch-upstream.sh
 ```
 
-Any future copied or modified upstream source file must retain the upstream MIT
-notice. The fetched audit tree is Git-ignored and is not packaged by
-`scripts/make-release.sh`.
+Copied or modified upstream source must retain the upstream MIT notice either
+in-file or through an adjacent directory-level attribution file. The embedded
+frontend carries `internal/webui/static/UPSTREAM-LICENSE.txt`; the fetched audit
+tree is Git-ignored and is not packaged by `scripts/make-release.sh`.
