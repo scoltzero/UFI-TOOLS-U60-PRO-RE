@@ -24,6 +24,24 @@ go run ./cmd/install-lan --base http://192.168.0.1 \
   --container build/backup_restore.bin
 ```
 
+## Graphical installers
+
+`cmd/installer-ui` is the source of the Windows graphical installer. It binds
+only to a random loopback port, opens the system browser, requires a random
+per-process CSRF token, rejects public device targets, and uses the same
+transactional LAN client. Build the PE32+ GUI executable with:
+
+```sh
+make build-installers
+```
+
+The clean-room native Android project is under `installer/android`. It supports
+document selection, preview mode, explicit restore confirmation, app-private
+original backup storage, restart-aware health checks, and rollback. Build it
+with JDK 17 and Android SDK 35 using `./gradlew :app:assembleDebug` from that
+directory. Signing and distribution are release concerns and are not performed
+by these commands.
+
 The signing private key is never stored in this repository or release bundle.
 
 Generate a release keypair once with `go run ./cmd/release-keygen`, move the
