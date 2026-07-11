@@ -86,24 +86,8 @@ func (z *ZTEHTTP) GoFormGetMany(ctx context.Context, keys []string) (map[string]
 }
 
 func (z *ZTEHTTP) GoFormCommand(ctx context.Context, values map[string]string) error {
-	form := url.Values{"isTest": {"false"}}
-	for key, value := range values {
-		if !validGoFormName(key) || len(value) > 4096 {
-			return ErrUnsupported
-		}
-		form.Set(key, value)
-	}
-	if form.Get("goformId") == "" {
-		return errors.New("goformId is required")
-	}
-	requestURL := z.resolve("/goform/goform_set_cmd_process")
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, strings.NewReader(form.Encode()))
+	response, err := z.GoFormCommandResult(ctx, values)
 	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	var response map[string]any
-	if err := z.doJSON(req, &response); err != nil {
 		return err
 	}
 	result := strings.ToLower(fmt.Sprint(response["result"]))
@@ -111,6 +95,30 @@ func (z *ZTEHTTP) GoFormCommand(ctx context.Context, values map[string]string) e
 		return fmt.Errorf("ZTE rejected goform operation: %v", response["result"])
 	}
 	return nil
+}
+
+func (z *ZTEHTTP) GoFormCommandResult(ctx context.Context, values map[string]string) (map[string]any, error) {
+	form := url.Values{"isTest": {"false"}}
+	for key, value := range values {
+		if !validGoFormName(key) || len(value) > 4096 {
+			return nil, ErrUnsupported
+		}
+		form.Set(key, value)
+	}
+	if form.Get("goformId") == "" {
+		return nil, errors.New("goformId is required")
+	}
+	requestURL := z.resolve("/goform/goform_set_cmd_process")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	var response map[string]any
+	if err := z.doJSON(req, &response); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 func (z *ZTEHTTP) get(ctx context.Context, keys []string) (map[string]string, error) {

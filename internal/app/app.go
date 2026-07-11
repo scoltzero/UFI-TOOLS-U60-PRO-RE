@@ -17,6 +17,7 @@ import (
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/hostsfile"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/httpapi"
 	processrunner "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/process"
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/smsforward"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
 	updateverify "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/update"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/workers"
@@ -29,6 +30,7 @@ type App struct {
 	store   *store.Store
 	server  *http.Server
 	workers *workers.Manager
+	sms     *smsforward.Manager
 	cancel  context.CancelFunc
 }
 
@@ -116,6 +118,8 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 			CellularInterval:  cfg.CellularInterval,
 		}, db, deviceBackend, app.logger)
 		app.workers.Start(workerContext)
+		app.sms = smsforward.New(db, deviceBackend, cfg.SMSPollInterval, nil, app.logger)
+		app.sms.Start(workerContext)
 	}
 	return app, nil
 }
@@ -142,6 +146,9 @@ func (a *App) Close() error {
 	}
 	if a.workers != nil {
 		a.workers.Stop()
+	}
+	if a.sms != nil {
+		a.sms.Stop()
 	}
 	return a.store.Close()
 }

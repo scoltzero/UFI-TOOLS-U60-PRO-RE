@@ -47,6 +47,7 @@ type Config struct {
 	UpdatePublicKey    string
 	SpeedtestBinary    string
 	HostsPath          string
+	SMSPollInterval    time.Duration
 }
 
 func Load() (Config, error) {
@@ -93,6 +94,11 @@ func Load() (Config, error) {
 	flags.StringVar(&cfg.UpdatePublicKey, "update-public-key", envString("UFI_UPDATE_PUBLIC_KEY", cfg.UpdatePublicKey), "trusted Ed25519 public key file")
 	flags.StringVar(&cfg.SpeedtestBinary, "speedtest-binary", envString("UFI_SPEEDTEST_BINARY", cfg.SpeedtestBinary), "speedtest executable path")
 	flags.StringVar(&cfg.HostsPath, "hosts-path", envString("UFI_HOSTS_PATH", cfg.HostsPath), "optional hosts file to manage")
+	smsInterval, err := time.ParseDuration(envString("UFI_SMS_POLL_INTERVAL", cfg.SMSPollInterval.String()))
+	if err != nil {
+		return Config{}, fmt.Errorf("UFI_SMS_POLL_INTERVAL: %w", err)
+	}
+	flags.DurationVar(&cfg.SMSPollInterval, "sms-poll-interval", smsInterval, "SMS forwarding poll interval")
 	skew, err := time.ParseDuration(envString("UFI_SIGN_CLOCK_SKEW", cfg.SignClockSkew.String()))
 	if err != nil {
 		return Config{}, fmt.Errorf("UFI_SIGN_CLOCK_SKEW: %w", err)
@@ -125,6 +131,7 @@ func Defaults() Config {
 		TTYDBinary:        "/data/ufi-tools/ttyd",
 		TTYDPort:          1146,
 		SpeedtestBinary:   "/data/ufi-tools/speedtest",
+		SMSPollInterval:   10 * time.Second,
 	}
 }
 
@@ -182,6 +189,9 @@ func (c Config) Validate() error {
 	}
 	if c.HostsPath != "" && !filepath.IsAbs(c.HostsPath) {
 		return errors.New("hosts path must be absolute")
+	}
+	if c.SMSPollInterval < 5*time.Second || c.SMSPollInterval > time.Hour {
+		return errors.New("SMS poll interval must be between five seconds and one hour")
 	}
 	if (c.UpdateManifestURL == "") != (c.UpdatePublicKey == "") {
 		return errors.New("update manifest URL and public key must be configured together")

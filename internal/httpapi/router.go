@@ -397,7 +397,10 @@ func (h *handler) deleteScheduler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) getSMSForward(w http.ResponseWriter, r *http.Request) {
-	value, err := h.deps.Store.GetSMSForward(r.Context())
+	value, err := h.deps.Store.Get(r.Context(), "kv", "sms_forward_sms")
+	if errors.Is(err, sql.ErrNoRows) {
+		value, err = h.deps.Store.GetSMSForward(r.Context())
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		value = `{}`
 	} else if err != nil {
@@ -417,7 +420,11 @@ func (h *handler) setSMSForward(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save SMS forwarding"})
 		return
 	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Message: "stored; forwarding worker is not configured"})
+	if err := h.deps.Store.Set(r.Context(), "kv", "sms_forward_sms", string(value)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save SMS forwarding compatibility state"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0})
 }
 
 func (h *handler) uploadFile(w http.ResponseWriter, r *http.Request) {

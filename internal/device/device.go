@@ -30,7 +30,14 @@ type Device interface {
 
 type MultiGoFormDevice interface {
 	GoFormGetMany(context.Context, []string) (map[string]string, error)
+}
+
+type GoFormCommandDevice interface {
 	GoFormCommand(context.Context, map[string]string) error
+}
+
+type GoFormResultDevice interface {
+	GoFormCommandResult(context.Context, map[string]string) (map[string]any, error)
 }
 
 // Simulator is deterministic and never touches ADB, the LAN, or the host shell.
@@ -107,6 +114,13 @@ func (s *Simulator) GoFormCommand(_ context.Context, values map[string]string) e
 	return nil
 }
 
+func (s *Simulator) GoFormCommandResult(ctx context.Context, values map[string]string) (map[string]any, error) {
+	if err := s.GoFormCommand(ctx, values); err != nil {
+		return nil, err
+	}
+	return map[string]any{"result": "success"}, nil
+}
+
 func GetMany(ctx context.Context, target Device, keys []string) (map[string]string, error) {
 	if multi, ok := target.(MultiGoFormDevice); ok {
 		return multi.GoFormGetMany(ctx, keys)
@@ -123,8 +137,18 @@ func GetMany(ctx context.Context, target Device, keys []string) (map[string]stri
 }
 
 func Command(ctx context.Context, target Device, values map[string]string) error {
-	if multi, ok := target.(MultiGoFormDevice); ok {
-		return multi.GoFormCommand(ctx, values)
+	if commander, ok := target.(GoFormCommandDevice); ok {
+		return commander.GoFormCommand(ctx, values)
 	}
 	return ErrUnsupported
+}
+
+func CommandResult(ctx context.Context, target Device, values map[string]string) (map[string]any, error) {
+	if resultDevice, ok := target.(GoFormResultDevice); ok {
+		return resultDevice.GoFormCommandResult(ctx, values)
+	}
+	if err := Command(ctx, target, values); err != nil {
+		return nil, err
+	}
+	return map[string]any{"result": "success"}, nil
 }
