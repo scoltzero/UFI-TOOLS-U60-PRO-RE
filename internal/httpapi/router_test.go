@@ -48,6 +48,36 @@ func TestAuthenticationAndDeviceStatus(t *testing.T) {
 	}
 }
 
+func TestRawLegacyAuthorizationToken(t *testing.T) {
+	router := testRouter(t, "secret")
+	req := httptest.NewRequest(http.MethodGet, "/api/device/status", nil)
+	req.Header.Set("Authorization", "secret")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected raw legacy token compatibility, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestEmbeddedUpstreamAndRecoveryFrontends(t *testing.T) {
+	router := testRouter(t, "secret")
+	for _, test := range []struct {
+		path     string
+		contains string
+	}{
+		{"/", "UFI-TOOLS-WEB"},
+		{"/script/requests.js", "KANO_baseURL"},
+		{"/lang/zh.json", "func_list"},
+		{"/re-admin/", "UFI-TOOLS U60 Pro RE"},
+	} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, test.path, nil))
+		if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), test.contains) {
+			t.Fatalf("GET %s: %d, missing %q", test.path, recorder.Code, test.contains)
+		}
+	}
+}
+
 func TestConfigPersistenceAndShellDefault(t *testing.T) {
 	router := testRouter(t, "")
 

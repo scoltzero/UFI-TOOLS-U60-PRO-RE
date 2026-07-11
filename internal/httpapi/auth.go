@@ -40,10 +40,12 @@ func (a authenticator) tokenOK(r *http.Request) bool {
 	}
 	provided := r.Header.Get("X-Device-Token")
 	if provided == "" {
-		provided = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		provided = r.Header.Get("Authorization")
+		provided = strings.TrimPrefix(provided, "Bearer ")
 	}
 	if provided == "" {
-		provided = strings.TrimPrefix(r.Header.Get("kano-Authorization"), "Bearer ")
+		provided = r.Header.Get("kano-Authorization")
+		provided = strings.TrimPrefix(provided, "Bearer ")
 	}
 	return subtle.ConstantTimeCompare([]byte(provided), []byte(a.cfg.DeviceToken)) == 1
 }

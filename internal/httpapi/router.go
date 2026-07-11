@@ -91,10 +91,11 @@ func New(deps Dependencies) http.Handler {
 	root.Handle("GET /api/need_token", public)
 	assets, _ := fs.Sub(webui.Files, "static")
 	root.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(assets))))
-	root.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFileFS(w, r, webui.Files, "static/index.html")
-	})
-	root.Handle("/", h.auth.middleware(protected))
+	protectedHandler := h.auth.middleware(protected)
+	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions} {
+		root.Handle(method+" /api/", protectedHandler)
+	}
+	root.Handle("GET /", http.FileServer(http.FS(assets)))
 	return limitBody(securityHeaders(root))
 }
 

@@ -13,9 +13,10 @@ Reusable protocol/UI behavior is integrated selectively:
 - API names and frontend request expectations inform the compatibility tests.
 - GoForm request behavior is implemented independently behind `device.Device`.
 - Plugin marker formats and custom-head behavior are supported by the Go core.
-- The new embedded UI is independently written; a future upstream-frontend
-  adapter can be tested against the compatibility router without changing the
-  device backend.
+- The complete MIT-licensed upstream frontend is embedded as the default UI and
+  is tested against the compatibility router without changing the device
+  backend. The independently written recovery dashboard remains available at
+  `/re-admin/`.
 
 Initialize the pinned source for auditing with:
 
