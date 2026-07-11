@@ -32,6 +32,7 @@ type Dependencies struct {
 	Version string
 	Catalog *catalog.Client
 	Runner  processrunner.Runner
+	TTYD    *processrunner.Supervisor
 }
 
 type handler struct {

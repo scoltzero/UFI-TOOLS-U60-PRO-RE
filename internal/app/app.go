@@ -79,11 +79,17 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 	if cfg.LegacyShellEnabled {
 		runner = processrunner.LocalRunner{Timeout: cfg.ShellTimeout, MaxOutput: cfg.ShellMaxOutput}
 	}
+	ttyd := &processrunner.Supervisor{
+		Binary:  cfg.TTYDBinary,
+		Args:    []string{"--port", fmt.Sprintf("%d", cfg.TTYDPort), "--writable", "/bin/sh"},
+		PIDFile: filepath.Join(cfg.DataDir, "ttyd.pid"),
+		LogFile: filepath.Join(cfg.DataDir, "ttyd.log"),
+	}
 
 	app.server = &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.New(httpapi.Dependencies{
-			Config: cfg, Store: db, Device: deviceBackend, Logger: app.logger, Version: app.version, Catalog: catalogClient, Runner: runner,
+			Config: cfg, Store: db, Device: deviceBackend, Logger: app.logger, Version: app.version, Catalog: catalogClient, Runner: runner, TTYD: ttyd,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

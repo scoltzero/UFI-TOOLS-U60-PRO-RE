@@ -41,6 +41,8 @@ type Config struct {
 	CellularInterval   time.Duration
 	ShellTimeout       time.Duration
 	ShellMaxOutput     int
+	TTYDBinary         string
+	TTYDPort           int
 }
 
 func Load() (Config, error) {
@@ -81,6 +83,8 @@ func Load() (Config, error) {
 	}
 	flags.DurationVar(&cfg.ShellTimeout, "shell-timeout", shellTimeout, "legacy shell command timeout")
 	flags.IntVar(&cfg.ShellMaxOutput, "shell-max-output", envInt("UFI_SHELL_MAX_OUTPUT", cfg.ShellMaxOutput), "legacy shell maximum combined output bytes")
+	flags.StringVar(&cfg.TTYDBinary, "ttyd-binary", envString("UFI_TTYD_BINARY", cfg.TTYDBinary), "ttyd binary path")
+	flags.IntVar(&cfg.TTYDPort, "ttyd-port", envInt("UFI_TTYD_PORT", cfg.TTYDPort), "ttyd listen port")
 	skew, err := time.ParseDuration(envString("UFI_SIGN_CLOCK_SKEW", cfg.SignClockSkew.String()))
 	if err != nil {
 		return Config{}, fmt.Errorf("UFI_SIGN_CLOCK_SKEW: %w", err)
@@ -110,6 +114,8 @@ func Defaults() Config {
 		CellularInterval:  5 * time.Minute,
 		ShellTimeout:      30 * time.Second,
 		ShellMaxOutput:    1 << 20,
+		TTYDBinary:        "/data/ufi-tools/ttyd",
+		TTYDPort:          1146,
 	}
 }
 
@@ -158,6 +164,9 @@ func (c Config) Validate() error {
 	}
 	if c.ShellMaxOutput < 1024 || c.ShellMaxOutput > 16<<20 {
 		return errors.New("shell maximum output must be between 1 KiB and 16 MiB")
+	}
+	if !filepath.IsAbs(c.TTYDBinary) || c.TTYDPort < 1 || c.TTYDPort > 65535 {
+		return errors.New("ttyd requires an absolute binary path and valid port")
 	}
 	switch c.DeviceBackend {
 	case "simulator":

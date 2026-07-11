@@ -3,11 +3,13 @@
 package httpapi
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
@@ -38,6 +40,10 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/list_uploads", h.listUploads)
 	mux.HandleFunc("POST /api/delete_all_uploads_data", h.deleteAllUploads)
 	mux.HandleFunc("GET /api/cellularUsage", h.recentCellular)
+	mux.HandleFunc("GET /api/hasTTYD", h.ttydStatus)
+	mux.HandleFunc("GET /api/ttyd/status", h.ttydStatus)
+	mux.HandleFunc("POST /api/ttyd/start", h.ttydStart)
+	mux.HandleFunc("POST /api/ttyd/stop", h.ttydStop)
 	mux.HandleFunc("POST /api/hosts_restore", h.restoreHosts)
 	mux.HandleFunc("GET /api/goform/goform_get_cmd_process", h.goFormGet)
 	mux.HandleFunc("POST /api/goform/goform_set_cmd_process", h.goFormSet)
@@ -58,8 +64,7 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	}
 
 	for _, pattern := range []string{
-		"GET /api/SELinux", "GET /api/usb_status", "GET /api/hasTTYD",
-		"GET /api/ttyd/status", "POST /api/ttyd/start", "POST /api/ttyd/stop",
+		"GET /api/SELinux", "GET /api/usb_status",
 		"GET /api/adb/status", "POST /api/adb/mode", "GET /api/adb_alive",
 		"POST /api/set_wakelock_status", "POST /api/update_admin_pwd",
 		"GET /api/wifi/qrcode", "POST /api/speedtest",
@@ -251,4 +256,40 @@ func toString(value any) string {
 
 func (h *handler) notAvailable(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusNotImplemented, envelope{Code: 501, Message: "recognized compatibility route; privileged device adapter is not configured"})
+}
+
+func (h *handler) ttydStatus(w http.ResponseWriter, _ *http.Request) {
+	if h.deps.TTYD == nil {
+		writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]bool{"installed": false, "running": false}})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: h.deps.TTYD.Status()})
+}
+
+func (h *handler) ttydStart(w http.ResponseWriter, _ *http.Request) {
+	if h.deps.TTYD == nil {
+		writeJSON(w, http.StatusServiceUnavailable, envelope{Code: 503, Message: "ttyd supervisor unavailable"})
+		return
+	}
+	status, err := h.deps.TTYD.Start()
+	if err != nil {
+		writeJSON(w, http.StatusConflict, envelope{Code: 409, Message: err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: status})
+}
+
+func (h *handler) ttydStop(w http.ResponseWriter, r *http.Request) {
+	if h.deps.TTYD == nil {
+		writeJSON(w, http.StatusServiceUnavailable, envelope{Code: 503, Message: "ttyd supervisor unavailable"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	status, err := h.deps.TTYD.Stop(ctx)
+	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "stop ttyd"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: status})
 }
