@@ -1,0 +1,25 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: true
+      - run: go test ./...
+      - run: go vet ./...
+      - name: Build static ARM64 service
+        run: make build-arm64
+      - name: Inspect artifact
+        run: file bin/ufi-tools-u60pro-linux-arm64
+
