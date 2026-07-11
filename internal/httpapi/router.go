@@ -21,6 +21,7 @@ import (
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/plugins"
 	processrunner "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/process"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
+	updateverify "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/update"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/webui"
 )
 
@@ -33,6 +34,7 @@ type Dependencies struct {
 	Catalog *catalog.Client
 	Runner  processrunner.Runner
 	TTYD    *processrunner.Supervisor
+	Updater *updateverify.Manager
 }
 
 type handler struct {

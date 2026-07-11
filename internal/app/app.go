@@ -17,6 +17,7 @@ import (
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/httpapi"
 	processrunner "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/process"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
+	updateverify "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/update"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/workers"
 )
 
@@ -75,6 +76,14 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 			return nil, fmt.Errorf("configure plugin catalog: %w", err)
 		}
 	}
+	var updater *updateverify.Manager
+	if cfg.UpdateManifestURL != "" {
+		updater, err = updateverify.NewManager(cfg.UpdateManifestURL, cfg.UpdatePublicKey, cfg.DataDir, &http.Client{Timeout: 30 * time.Second})
+		if err != nil {
+			db.Close()
+			return nil, fmt.Errorf("configure signed updates: %w", err)
+		}
+	}
 	var runner processrunner.Runner = processrunner.LocalRunner{Timeout: cfg.ShellTimeout, MaxOutput: cfg.ShellMaxOutput}
 	ttyd := &processrunner.Supervisor{
 		Binary:  cfg.TTYDBinary,
@@ -86,7 +95,7 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 	app.server = &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.New(httpapi.Dependencies{
-			Config: cfg, Store: db, Device: deviceBackend, Logger: app.logger, Version: app.version, Catalog: catalogClient, Runner: runner, TTYD: ttyd,
+			Config: cfg, Store: db, Device: deviceBackend, Logger: app.logger, Version: app.version, Catalog: catalogClient, Runner: runner, TTYD: ttyd, Updater: updater,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

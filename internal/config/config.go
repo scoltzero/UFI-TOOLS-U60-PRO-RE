@@ -43,6 +43,8 @@ type Config struct {
 	ShellMaxOutput     int
 	TTYDBinary         string
 	TTYDPort           int
+	UpdateManifestURL  string
+	UpdatePublicKey    string
 }
 
 func Load() (Config, error) {
@@ -85,6 +87,8 @@ func Load() (Config, error) {
 	flags.IntVar(&cfg.ShellMaxOutput, "shell-max-output", envInt("UFI_SHELL_MAX_OUTPUT", cfg.ShellMaxOutput), "legacy shell maximum combined output bytes")
 	flags.StringVar(&cfg.TTYDBinary, "ttyd-binary", envString("UFI_TTYD_BINARY", cfg.TTYDBinary), "ttyd binary path")
 	flags.IntVar(&cfg.TTYDPort, "ttyd-port", envInt("UFI_TTYD_PORT", cfg.TTYDPort), "ttyd listen port")
+	flags.StringVar(&cfg.UpdateManifestURL, "update-manifest-url", envString("UFI_UPDATE_MANIFEST_URL", cfg.UpdateManifestURL), "optional signed update manifest URL")
+	flags.StringVar(&cfg.UpdatePublicKey, "update-public-key", envString("UFI_UPDATE_PUBLIC_KEY", cfg.UpdatePublicKey), "trusted Ed25519 public key file")
 	skew, err := time.ParseDuration(envString("UFI_SIGN_CLOCK_SKEW", cfg.SignClockSkew.String()))
 	if err != nil {
 		return Config{}, fmt.Errorf("UFI_SIGN_CLOCK_SKEW: %w", err)
@@ -167,6 +171,25 @@ func (c Config) Validate() error {
 	}
 	if !filepath.IsAbs(c.TTYDBinary) || c.TTYDPort < 1 || c.TTYDPort > 65535 {
 		return errors.New("ttyd requires an absolute binary path and valid port")
+	}
+	if (c.UpdateManifestURL == "") != (c.UpdatePublicKey == "") {
+		return errors.New("update manifest URL and public key must be configured together")
+	}
+	if c.UpdatePublicKey != "" && !filepath.IsAbs(c.UpdatePublicKey) {
+		return errors.New("update public key path must be absolute")
+	}
+	if c.UpdateManifestURL != "" {
+		updateURL, err := url.Parse(c.UpdateManifestURL)
+		if err != nil || updateURL.Host == "" || (updateURL.Scheme != "http" && updateURL.Scheme != "https") {
+			return errors.New("update manifest URL must use HTTP(S)")
+		}
+		if updateURL.Scheme == "http" {
+			host := updateURL.Hostname()
+			ip := net.ParseIP(host)
+			if !strings.EqualFold(host, "localhost") && (ip == nil || !(ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast())) {
+				return errors.New("plain HTTP updates must use a private, loopback, or link-local address")
+			}
+		}
 	}
 	switch c.DeviceBackend {
 	case "simulator":

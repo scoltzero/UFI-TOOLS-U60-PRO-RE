@@ -10,9 +10,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 )
+
+var safeVersion = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z._+-]{0,63}$`)
 
 type Manifest struct {
 	Version   string `json:"version"`
@@ -38,7 +41,7 @@ func (m Manifest) payload() ([]byte, error) {
 }
 
 func (m Manifest) Validate() error {
-	if m.Version == "" || m.Artifact == "" || m.Size <= 0 {
+	if !safeVersion.MatchString(m.Version) || m.Artifact == "" || m.Size <= 0 {
 		return errors.New("manifest fields are incomplete")
 	}
 	if strings.Contains(m.Artifact, "/") || strings.Contains(m.Artifact, "\\") {

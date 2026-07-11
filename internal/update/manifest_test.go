@@ -36,3 +36,10 @@ func TestVerifyManifestAndArtifact(t *testing.T) {
 		t.Fatal("expected signature failure")
 	}
 }
+
+func TestManifestRejectsTraversalVersion(t *testing.T) {
+	manifest := Manifest{Version: "../escape", Artifact: "ufi-tools-u60pro", SHA256: strings.Repeat("00", 32), Size: 1, Published: time.Now().UTC().Format(time.RFC3339)}
+	if err := manifest.Validate(); err == nil {
+		t.Fatal("expected unsafe version rejection")
+	}
+}

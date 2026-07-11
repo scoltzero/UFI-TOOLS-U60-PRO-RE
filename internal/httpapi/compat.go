@@ -54,6 +54,11 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/adb_wifi_setting", h.adbMode)
 	mux.HandleFunc("GET /api/get_official_web_password", h.getKV("official_web_password", ""))
 	mux.HandleFunc("POST /api/update_admin_pwd", h.setKV("official_web_password"))
+	mux.HandleFunc("GET /api/check_update", h.updateCheck)
+	mux.HandleFunc("POST /api/download_update", h.updateDownload)
+	mux.HandleFunc("GET /api/download_update_status", h.updateStatus)
+	mux.HandleFunc("POST /api/install_update", h.updateInstall)
+	mux.HandleFunc("GET /api/auto_update/check_now", h.updateCheck)
 	mux.HandleFunc("POST /api/hosts_restore", h.restoreHosts)
 	mux.HandleFunc("GET /api/goform/goform_get_cmd_process", h.goFormGet)
 	mux.HandleFunc("POST /api/goform/goform_set_cmd_process", h.goFormSet)
@@ -87,8 +92,6 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 		"GET /api/SELinux", "GET /api/usb_status",
 		"POST /api/set_wakelock_status",
 		"GET /api/wifi/qrcode", "POST /api/speedtest",
-		"GET /api/check_update", "POST /api/download_update", "GET /api/download_update_status",
-		"POST /api/install_update", "GET /api/auto_update/check_now",
 		"POST /api/upload_img", "DELETE /api/delete_img",
 		"GET /api/plugin/list", "GET /api/plugin/changelog", "GET /api/plugin/notifications",
 		"POST /api/plugin/notification/read", "GET /api/plugin/update/check",
