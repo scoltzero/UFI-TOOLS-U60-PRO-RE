@@ -201,3 +201,17 @@ func TestADBModeUsesFixedCommand(t *testing.T) {
 		t.Fatalf("unexpected command: %q", runner.lastCommand)
 	}
 }
+
+func TestAPNModeCompatibility(t *testing.T) {
+	router := testRouter(t, "")
+	set := httptest.NewRecorder()
+	router.ServeHTTP(set, httptest.NewRequest(http.MethodPost, "/api/apn/mode", strings.NewReader(`{"mode":"manual","index":3}`)))
+	if set.Code != http.StatusOK {
+		t.Fatalf("set APN mode: %d %s", set.Code, set.Body.String())
+	}
+	get := httptest.NewRecorder()
+	router.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/api/apn/mode", nil))
+	if get.Code != http.StatusOK || !strings.Contains(get.Body.String(), "manual") {
+		t.Fatalf("get APN mode: %d %s", get.Code, get.Body.String())
+	}
+}

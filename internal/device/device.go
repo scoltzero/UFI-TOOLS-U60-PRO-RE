@@ -28,6 +28,11 @@ type Device interface {
 	GoFormSet(context.Context, string, string) error
 }
 
+type MultiGoFormDevice interface {
+	GoFormGetMany(context.Context, []string) (map[string]string, error)
+	GoFormCommand(context.Context, map[string]string) error
+}
+
 // Simulator is deterministic and never touches ADB, the LAN, or the host shell.
 type Simulator struct {
 	mu      sync.RWMutex
@@ -78,4 +83,48 @@ func (s *Simulator) GoFormSet(_ context.Context, key, value string) error {
 	defer s.mu.Unlock()
 	s.values[key] = value
 	return nil
+}
+
+func (s *Simulator) GoFormGetMany(ctx context.Context, keys []string) (map[string]string, error) {
+	result := make(map[string]string, len(keys))
+	for _, key := range keys {
+		value, err := s.GoFormGet(ctx, key)
+		if err == nil {
+			result[key] = value
+		}
+	}
+	return result, nil
+}
+
+func (s *Simulator) GoFormCommand(_ context.Context, values map[string]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for key, value := range values {
+		if key != "goformId" && key != "isTest" {
+			s.values[key] = value
+		}
+	}
+	return nil
+}
+
+func GetMany(ctx context.Context, target Device, keys []string) (map[string]string, error) {
+	if multi, ok := target.(MultiGoFormDevice); ok {
+		return multi.GoFormGetMany(ctx, keys)
+	}
+	result := make(map[string]string, len(keys))
+	for _, key := range keys {
+		value, err := target.GoFormGet(ctx, key)
+		if err != nil {
+			continue
+		}
+		result[key] = value
+	}
+	return result, nil
+}
+
+func Command(ctx context.Context, target Device, values map[string]string) error {
+	if multi, ok := target.(MultiGoFormDevice); ok {
+		return multi.GoFormCommand(ctx, values)
+	}
+	return ErrUnsupported
 }

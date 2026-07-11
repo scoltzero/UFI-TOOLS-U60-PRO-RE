@@ -78,7 +78,24 @@ func (z *ZTEHTTP) GoFormSet(ctx context.Context, key, value string) error {
 	if !validGoFormName(key) {
 		return ErrUnsupported
 	}
-	form := url.Values{"isTest": {"false"}, "goformId": {key}, key: {value}}
+	return z.GoFormCommand(ctx, map[string]string{"goformId": key, key: value})
+}
+
+func (z *ZTEHTTP) GoFormGetMany(ctx context.Context, keys []string) (map[string]string, error) {
+	return z.get(ctx, keys)
+}
+
+func (z *ZTEHTTP) GoFormCommand(ctx context.Context, values map[string]string) error {
+	form := url.Values{"isTest": {"false"}}
+	for key, value := range values {
+		if !validGoFormName(key) || len(value) > 4096 {
+			return ErrUnsupported
+		}
+		form.Set(key, value)
+	}
+	if form.Get("goformId") == "" {
+		return errors.New("goformId is required")
+	}
 	requestURL := z.resolve("/goform/goform_set_cmd_process")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, strings.NewReader(form.Encode()))
 	if err != nil {

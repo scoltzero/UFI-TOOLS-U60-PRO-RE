@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
 )
 
 func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
@@ -55,6 +57,16 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/hosts_restore", h.restoreHosts)
 	mux.HandleFunc("GET /api/goform/goform_get_cmd_process", h.goFormGet)
 	mux.HandleFunc("POST /api/goform/goform_set_cmd_process", h.goFormSet)
+	mux.HandleFunc("GET /api/apn/all", h.apnAll)
+	mux.HandleFunc("GET /api/apn/auto", h.apnAll)
+	mux.HandleFunc("GET /api/apn/manual", h.apnAll)
+	mux.HandleFunc("POST /api/apn/manual", h.apnSave)
+	mux.HandleFunc("DELETE /api/apn/manual/{id}", h.apnDelete)
+	mux.HandleFunc("GET /api/apn/mode", h.apnModeGet)
+	mux.HandleFunc("POST /api/apn/mode", h.apnModeSet)
+	mux.HandleFunc("GET /api/apn/cid", h.apnCID)
+	mux.HandleFunc("GET /api/apn/manual/enabled", h.apnEnabled)
+	mux.HandleFunc("POST /api/apn/manual/enable", h.apnEnable)
 
 	for _, route := range []struct{ path, key, fallback string }{
 		{"/api/sms_forward_enabled", "sms_forward_enabled", "false"},
@@ -88,19 +100,6 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 		mux.HandleFunc(pattern, h.notAvailable)
 	}
 
-	for _, route := range []struct{ pattern, key string }{
-		{"GET /api/apn/mode", "apn_mode"}, {"POST /api/apn/mode", "apn_mode"},
-		{"GET /api/apn/cid", "pdp_type"}, {"GET /api/apn/manual/enabled", "apn_select"},
-		{"POST /api/apn/manual/enable", "apn_select"},
-	} {
-		mux.HandleFunc(route.pattern, h.goFormCompatibility(route.key))
-	}
-	for _, pattern := range []string{
-		"GET /api/apn/all", "GET /api/apn/auto", "GET /api/apn/manual",
-		"POST /api/apn/manual", "DELETE /api/apn/manual/{id}",
-	} {
-		mux.HandleFunc(pattern, h.notAvailable)
-	}
 }
 
 func (h *handler) stableID(key string) http.HandlerFunc {
@@ -247,6 +246,146 @@ func (h *handler) goFormCompatibility(key string) http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusOK, envelope{Code: 0})
 	}
+}
+
+func apnKeys() []string {
+	keys := []string{
+		"apn_interface_version", "apn_m_profile_name", "profile_name", "apn_wan_dial",
+		"apn_select", "apn_pdp_type", "apn_pdp_select", "apn_pdp_addr", "index",
+		"apn_Current_index", "apn_auto_config", "apn_ipv6_apn_auto_config", "apn_mode",
+		"apn_wan_apn", "apn_ppp_auth_mode", "apn_ppp_username", "apn_ppp_passwd",
+		"dns_mode", "prefer_dns_manual", "standby_dns_manual", "apn_ipv6_wan_apn",
+		"apn_ipv6_pdp_type", "apn_ipv6_ppp_auth_mode", "apn_ipv6_ppp_username",
+		"apn_ipv6_ppp_passwd", "ipv6_dns_mode", "ipv6_prefer_dns_manual",
+		"ipv6_standby_dns_manual", "apn_num_preset",
+	}
+	for index := 0; index < 20; index++ {
+		keys = append(keys, "APN_config"+strconv.Itoa(index), "ipv6_APN_config"+strconv.Itoa(index))
+	}
+	return keys
+}
+
+func (h *handler) apnAll(w http.ResponseWriter, r *http.Request) {
+	values, err := device.GetMany(r.Context(), h.deps.Device, apnKeys())
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "read APN data"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: values})
+}
+
+func (h *handler) apnModeGet(w http.ResponseWriter, r *http.Request) {
+	value, err := h.deps.Device.GoFormGet(r.Context(), "apn_mode")
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "read APN mode"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]string{"mode": value}})
+}
+
+func (h *handler) apnModeSet(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Mode  string `json:"mode"`
+		Index int    `json:"index"`
+	}
+	if err := decodeJSON(r, &request); err != nil || request.Mode != "auto" && request.Mode != "manual" || request.Index < 0 || request.Index > 19 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "mode must be auto/manual and index 0..19"})
+		return
+	}
+	values := map[string]string{"goformId": "APN_PROC_EX", "apn_mode": request.Mode}
+	if request.Mode == "manual" {
+		values["apn_action"] = "set_default"
+		values["set_default_flag"] = "1"
+		values["apn_pdp_type"] = ""
+		values["index"] = strconv.Itoa(request.Index)
+	}
+	if err := device.Command(r.Context(), h.deps.Device, values); err != nil {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "set APN mode"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0})
+}
+
+func (h *handler) apnSave(w http.ResponseWriter, r *http.Request) {
+	var request map[string]any
+	if err := decodeJSON(r, &request); err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid APN profile"})
+		return
+	}
+	values := map[string]string{"goformId": "APN_PROC_EX", "apn_mode": "manual", "apn_action": "save"}
+	for key, value := range request {
+		if key == "goformId" || key == "apn_action" || key == "apn_mode" || len(key) > 64 {
+			continue
+		}
+		encoded := strings.Trim(toString(value), "\"")
+		if len(encoded) <= 256 {
+			values[key] = encoded
+		}
+	}
+	if err := device.Command(r.Context(), h.deps.Device, values); err != nil {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "save APN profile"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0})
+}
+
+func (h *handler) apnDelete(w http.ResponseWriter, r *http.Request) {
+	index, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || index < 0 || index > 19 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "APN index must be 0..19"})
+		return
+	}
+	err = device.Command(r.Context(), h.deps.Device, map[string]string{
+		"goformId": "APN_PROC_EX", "index": strconv.Itoa(index), "apn_mode": "manual", "apn_action": "delete",
+	})
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "delete APN profile"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0})
+}
+
+func (h *handler) apnCID(w http.ResponseWriter, r *http.Request) {
+	index, err := strconv.Atoi(r.URL.Query().Get("cid"))
+	if err != nil || index < 0 || index > 19 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "cid must be 0..19"})
+		return
+	}
+	keys := []string{"APN_config" + strconv.Itoa(index), "ipv6_APN_config" + strconv.Itoa(index)}
+	values, err := device.GetMany(r.Context(), h.deps.Device, keys)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "read APN profile"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: values})
+}
+
+func (h *handler) apnEnabled(w http.ResponseWriter, r *http.Request) {
+	values, err := device.GetMany(r.Context(), h.deps.Device, []string{"apn_mode", "apn_Current_index", "apn_select"})
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "read active APN"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: values})
+}
+
+func (h *handler) apnEnable(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Index int `json:"index"`
+	}
+	if err := decodeJSON(r, &request); err != nil || request.Index < 0 || request.Index > 19 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "index must be 0..19"})
+		return
+	}
+	err := device.Command(r.Context(), h.deps.Device, map[string]string{
+		"goformId": "APN_PROC_EX", "apn_mode": "manual", "apn_action": "set_default",
+		"set_default_flag": "1", "apn_pdp_type": "", "index": strconv.Itoa(request.Index),
+	})
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "enable APN profile"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0})
 }
 
 func toString(value any) string {
