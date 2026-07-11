@@ -4,15 +4,16 @@ No command in this checklist contacts a U60 Pro.
 
 ```sh
 go version # must report go1.26.5 or newer within the 1.26 line
-go test ./...
-go vet ./...
-go test -race ./...
+make test
+make lint
+go list -e ./... | rg -v '/third_party/' | xargs go test -race
 go mod verify
 go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
 make build-arm64
+make build-installers
 make installer-test
 node --check internal/webui/static/app.js
-file bin/ufi-tools-u60pro-linux-arm64 bin/verify-release-linux-arm64
+file bin/ufi-tools-u60pro-linux-arm64 bin/verify-release-linux-arm64 bin/UFI-TOOLS-U60-Pro-Installer.exe
 sh -n installer/install-adb.sh installer/bundle/service.sh
 ```
 
@@ -23,9 +24,6 @@ Expected build properties:
 - unit tests use temporary directories and the deterministic device simulator;
 - the vulnerability scan reports zero reachable vulnerabilities;
 - installer transport defaults to dry-run and requires `--execute` to invoke ADB;
-- no test discovers or opens a network connection to a device.
+- unit tests do not discover or open a network connection to a device.
 
-Device validation is a separate, future authorization gate. Before it occurs,
-capture a full backup, verify rollback manually, use a disposable test unit if
-possible, and record firmware/model identifiers in a redacted compatibility
-report.
+The separate authorized device record is in `docs/device-validation.md`.

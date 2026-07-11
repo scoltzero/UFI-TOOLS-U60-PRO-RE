@@ -1,10 +1,10 @@
 .PHONY: test lint build build-arm64 build-installers installer-test
 
 test:
-	go test ./...
+	go list -e ./... | rg -v '/third_party/' | xargs go test
 
 lint:
-	go vet ./...
+	go list -e ./... | rg -v '/third_party/' | xargs go vet
 
 build:
 	go build -buildvcs=false -trimpath -o bin/ufi-tools-u60pro ./cmd/ufi-tools-u60pro

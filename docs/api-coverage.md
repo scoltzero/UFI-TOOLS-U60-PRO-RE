@@ -9,7 +9,7 @@ Coverage is tracked by behavior rather than private implementation details.
 | Primary token auth | Implemented | Constant-time header/Bearer comparison |
 | Legacy timestamp signature | Compatibility profile | Opt-in and clock-skew limited |
 | Configuration | Implemented | Persistent identity, security, service and store flags |
-| Device status | Adapter complete | Simulator and explicit private-address ZTE HTTP backend |
+| Device status | Adapter complete | Simulator, ZTE GoForm, and calibrated U60 OpenWrt UBUS backends |
 | ZTE GoForm | Implemented | Single/multi get and command-result contracts |
 | Time | Implemented | Status plus guarded device-only mutation |
 | Remote shell | Implemented, opt-in | Authentication, timeout, output cap and exit status |
@@ -20,10 +20,10 @@ Coverage is tracked by behavior rather than private implementation details.
 | SMS forwarding | Implemented | ZTE polling, dedupe, blacklist, CURL, DingTalk, TLS SMTP and SMS sinks |
 | Cellular history | Implemented | Bounded recent-point persistence/query |
 | Uploads | Implemented | SQLite blob storage, safe names, 1 MiB limit |
-| APN/cellular controls | Implemented | U60 `APN_PROC_EX` profile list/save/delete/select and traffic worker |
+| APN/cellular controls | Implemented | GoForm plus U60 UBUS list/save/delete/select; encrypted APN passwords stay in official UI |
 | ADB/ttyd lifecycle | Implemented | Fixed ADB commands and PID/log-supervised ttyd process |
 | OTA | Implemented | Same-origin fetch, Ed25519, size/SHA-256, staging and transactional install |
-| LAN restore installer | Offline implementation | Archive/MD5/OpenSSL-3DES generation; real restore intentionally untested |
+| LAN restore installer | Transaction implemented | Original backup, official upload/RPC, restart health proof and rollback; destructive restore untested |
 
 “Simulated” means route behavior can be developed and tested without accessing
 a U60 Pro. It does not claim that the device adapter or vendor restore parser
