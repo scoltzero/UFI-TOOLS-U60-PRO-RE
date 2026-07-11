@@ -17,3 +17,13 @@ the public backup container format is implemented and fixture-tested.
 
 The signing private key is never stored in this repository or release bundle.
 
+Generate a release keypair once with `go run ./cmd/release-keygen`, move the
+private key to offline secret storage, and build a verified bundle with:
+
+```sh
+VERSION=0.1.0 PRIVATE_KEY=/secure/private.hex PUBLIC_KEY=release-public-key.hex \
+  ./scripts/make-release.sh
+```
+
+`installer/test-transaction.sh` exercises the atomic swap and failure rollback
+entirely under a temporary directory with fake health and verifier commands.

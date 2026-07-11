@@ -22,4 +22,5 @@ jobs:
         run: make build-arm64
       - name: Inspect artifact
         run: file bin/ufi-tools-u60pro-linux-arm64
-
+      - name: Test transactional installer rollback
+        run: make installer-test

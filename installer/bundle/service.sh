@@ -1,10 +1,12 @@
 #!/bin/sh
 set -eu
 
-ROOT=/data/ufi-tools
-NEXT=/data/ufi-tools.next
-BACKUP=/data/ufi-tools.previous
+ROOT=${UFI_INSTALL_ROOT:-/data/ufi-tools}
+NEXT=${ROOT}.next
+BACKUP=${ROOT}.previous
 PIDFILE=$ROOT/ufi-tools.pid
+HEALTH_URL=${UFI_HEALTH_URL:-http://127.0.0.1:2333/healthz}
+HEALTH_ATTEMPTS=${UFI_HEALTH_ATTEMPTS:-20}
 
 start() {
   [ -x "$ROOT/ufi-tools-u60pro" ] || exit 1
@@ -22,8 +24,8 @@ stop() {
 
 health() {
   i=0
-  while [ "$i" -lt 20 ]; do
-    if wget -q -O - http://127.0.0.1:2333/healthz >/dev/null 2>&1; then return 0; fi
+  while [ "$i" -lt "$HEALTH_ATTEMPTS" ]; do
+    if wget -q -O - "$HEALTH_URL" >/dev/null 2>&1; then return 0; fi
     i=$((i + 1))
     sleep 1
   done

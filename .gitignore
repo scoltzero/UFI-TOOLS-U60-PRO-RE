@@ -23,4 +23,5 @@
 *.mbn
 *.hex
 *.img
-
+*private-key*.hex
+release-public-key.hex
