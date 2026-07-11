@@ -15,6 +15,7 @@ import (
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/httpapi"
+	processrunner "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/process"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/workers"
 )
@@ -74,11 +75,15 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 			return nil, fmt.Errorf("configure plugin catalog: %w", err)
 		}
 	}
+	var runner processrunner.Runner
+	if cfg.LegacyShellEnabled {
+		runner = processrunner.LocalRunner{Timeout: cfg.ShellTimeout, MaxOutput: cfg.ShellMaxOutput}
+	}
 
 	app.server = &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.New(httpapi.Dependencies{
-			Config: cfg, Store: db, Device: deviceBackend, Logger: app.logger, Version: app.version, Catalog: catalogClient,
+			Config: cfg, Store: db, Device: deviceBackend, Logger: app.logger, Version: app.version, Catalog: catalogClient, Runner: runner,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

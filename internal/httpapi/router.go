@@ -19,6 +19,7 @@ import (
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/plugins"
+	processrunner "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/process"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/webui"
 )
@@ -30,6 +31,7 @@ type Dependencies struct {
 	Logger  *slog.Logger
 	Version string
 	Catalog *catalog.Client
+	Runner  processrunner.Runner
 }
 
 type handler struct {
@@ -190,12 +192,33 @@ func (h *handler) timeSync(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusNotImplemented, envelope{Code: 501, Message: "host time mutation is unavailable in simulator mode"})
 }
 
-func (h *handler) runShell(w http.ResponseWriter, _ *http.Request) {
+func (h *handler) runShell(w http.ResponseWriter, r *http.Request) {
 	if !h.deps.Config.LegacyShellEnabled {
 		writeJSON(w, http.StatusForbidden, envelope{Code: 403, Message: "legacy shell is disabled"})
 		return
 	}
-	writeJSON(w, http.StatusNotImplemented, envelope{Code: 501, Message: "no command runner is configured"})
+	if h.deps.Runner == nil {
+		writeJSON(w, http.StatusServiceUnavailable, envelope{Code: 503, Message: "no command runner is configured"})
+		return
+	}
+	var request struct {
+		Command string `json:"command"`
+		Cmd     string `json:"cmd"`
+	}
+	if err := decodeJSON(r, &request); err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid shell request"})
+		return
+	}
+	command := request.Command
+	if command == "" {
+		command = request.Cmd
+	}
+	result, err := h.deps.Runner.Run(r.Context(), command)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "execute command"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: result})
 }
 
 func (h *handler) getCustomHead(w http.ResponseWriter, r *http.Request) {

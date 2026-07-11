@@ -39,6 +39,8 @@ type Config struct {
 	WorkersEnabled     bool
 	SchedulerInterval  time.Duration
 	CellularInterval   time.Duration
+	ShellTimeout       time.Duration
+	ShellMaxOutput     int
 }
 
 func Load() (Config, error) {
@@ -73,6 +75,12 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("UFI_CELLULAR_INTERVAL: %w", err)
 	}
 	flags.DurationVar(&cfg.CellularInterval, "cellular-interval", cellularInterval, "cellular sample interval")
+	shellTimeout, err := time.ParseDuration(envString("UFI_SHELL_TIMEOUT", cfg.ShellTimeout.String()))
+	if err != nil {
+		return Config{}, fmt.Errorf("UFI_SHELL_TIMEOUT: %w", err)
+	}
+	flags.DurationVar(&cfg.ShellTimeout, "shell-timeout", shellTimeout, "legacy shell command timeout")
+	flags.IntVar(&cfg.ShellMaxOutput, "shell-max-output", envInt("UFI_SHELL_MAX_OUTPUT", cfg.ShellMaxOutput), "legacy shell maximum combined output bytes")
 	skew, err := time.ParseDuration(envString("UFI_SIGN_CLOCK_SKEW", cfg.SignClockSkew.String()))
 	if err != nil {
 		return Config{}, fmt.Errorf("UFI_SIGN_CLOCK_SKEW: %w", err)
@@ -100,6 +108,8 @@ func Defaults() Config {
 		DeviceHTTPTimeout: 5 * time.Second,
 		SchedulerInterval: 5 * time.Second,
 		CellularInterval:  5 * time.Minute,
+		ShellTimeout:      30 * time.Second,
+		ShellMaxOutput:    1 << 20,
 	}
 }
 
@@ -142,6 +152,12 @@ func (c Config) Validate() error {
 	}
 	if c.CellularInterval < time.Second || c.CellularInterval > 24*time.Hour {
 		return errors.New("cellular interval must be between one second and 24 hours")
+	}
+	if c.ShellTimeout < time.Second || c.ShellTimeout > 10*time.Minute {
+		return errors.New("shell timeout must be between one second and ten minutes")
+	}
+	if c.ShellMaxOutput < 1024 || c.ShellMaxOutput > 16<<20 {
+		return errors.New("shell maximum output must be between 1 KiB and 16 MiB")
 	}
 	switch c.DeviceBackend {
 	case "simulator":
@@ -193,6 +209,18 @@ func envBool(name string, fallback bool) bool {
 		return fallback
 	}
 	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fallback
+	}
+	return parsed
+}
+
+func envInt(name string, fallback int) int {
+	value, ok := os.LookupEnv(name)
+	if !ok {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
 	if err != nil {
 		return fallback
 	}

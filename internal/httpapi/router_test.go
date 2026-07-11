@@ -10,9 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
+	processrunner "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/process"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
 )
 
@@ -146,5 +148,28 @@ func TestLegacyIdentitySettingsPersist(t *testing.T) {
 		if recorder.Code != http.StatusOK {
 			t.Fatalf("%s: %d %s", request.path, recorder.Code, recorder.Body.String())
 		}
+	}
+}
+
+func TestExplicitLegacyShellRunner(t *testing.T) {
+	db, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	cfg := config.Defaults()
+	cfg.DeviceToken = "0123456789abcdef"
+	cfg.LegacyAuthEnabled = true
+	cfg.LegacyShellEnabled = true
+	router := New(Dependencies{
+		Config: cfg, Store: db, Device: device.NewSimulator(),
+		Runner: processrunner.LocalRunner{Timeout: time.Second, MaxOutput: 1024},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/api/run_shell", strings.NewReader(`{"command":"printf compatible"}`))
+	req.Header.Set("X-Device-Token", cfg.DeviceToken)
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "compatible") {
+		t.Fatalf("unexpected shell response: %d %s", recorder.Code, recorder.Body.String())
 	}
 }
