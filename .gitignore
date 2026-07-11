@@ -23,4 +23,6 @@
 *.mbn
 *.hex
 *.img
-
+*private-key*.hex
+release-public-key.hex
+/third_party/UFI-TOOLS/

@@ -5,8 +5,9 @@ The project combines reusable MIT-licensed concepts from the upstream
 [kanoqwq/UFI-TOOLS](https://github.com/kanoqwq/UFI-TOOLS) project with a
 clean-room reimplementation of device-specific observable behavior.
 
-> Status: active clean-room implementation. It is not ready for installation
-> on a device. Development and tests currently run without touching a U60 Pro.
+> Status: implementation-complete pre-device-validation release candidate.
+> Development and tests intentionally run without touching a U60 Pro; physical
+> installation remains a separate authorization and validation gate.
 
 ## Goals
 
@@ -31,10 +32,30 @@ attributed open-source code belong here. Research inputs stay outside Git and
 are represented by sanitized behavior specifications and test fixtures.
 
 See [Architecture](docs/architecture.md), [Clean-room policy](docs/clean-room.md),
-and [Threat model](docs/threat-model.md).
+and [Threat model](docs/threat-model.md). Current endpoint coverage is tracked
+in [API coverage](docs/api-coverage.md).
+
+## Local development
+
+```sh
+go test ./...
+go run ./cmd/ufi-tools-u60pro --data-dir "$PWD/tmp/data" --http-addr 127.0.0.1:2333
+```
+
+Open `http://127.0.0.1:2333`. The development service uses a deterministic U60
+Pro simulator and never falls through to a connected device. On first start it
+generates a token in `tmp/data/device-token`; enter that token in the web UI.
+
+Build the target binaries with `make build-arm64`. Installation is documented
+under `installer/`; its ADB transport is dry-run-only unless `--execute` is
+explicitly supplied.
+
+The web dashboard exposes device status, ADB/ttyd controls, hosts management,
+verified plugins, scheduling and SMS-forwarding configuration. The backend also
+implements the observed legacy API surface for upstream frontend/plugin
+compatibility.
 
 ## License
 
 New code is licensed under `AGPL-3.0-or-later`. Reused upstream UFI-TOOLS code
 retains its MIT license. See `LICENSE`, `LICENSES/`, and `NOTICE`.
-

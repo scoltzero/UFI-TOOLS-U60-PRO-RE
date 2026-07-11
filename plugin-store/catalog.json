@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "plugins": [
+    {
+      "id": "example-status",
+      "name": "Example Status Plugin",
+      "version": "0.1.0",
+      "description": "Minimal open plugin used to validate the self-hosted catalog format.",
+      "author": "UFI-TOOLS-U60-PRO-RE contributors",
+      "file": "example-status.js",
+      "sha256": "d421eeac63b8fc2a1e82dbe15e370ed07474a3b90ee7e398d039023af692f128",
+      "size": 323
+    }
+  ]
+}
