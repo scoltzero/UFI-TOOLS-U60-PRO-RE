@@ -12,8 +12,17 @@ Both installation transports consume the same release bundle and transaction:
 
 `install-adb.sh` is the preferred authorized-ADB transport. It defaults to a
 dry run and does not contact a device unless `--execute` is passed. The LAN
-backup transport is documented as a bundle adapter and remains disabled until
-the public backup container format is implemented and fixture-tested.
+transport has the same dry-run default and implements original-backup capture,
+the official multipart upload and UBUS restore calls, restart-aware health
+checking, and automatic rollback. The container format still needs final
+calibration against an authorized real-device backup before production use.
+
+Build and preview the LAN transport with:
+
+```sh
+go run ./cmd/install-lan --base http://192.168.0.1 \
+  --container build/backup_restore.bin
+```
 
 The signing private key is never stored in this repository or release bundle.
 
