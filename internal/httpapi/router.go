@@ -69,6 +69,7 @@ func New(deps Dependencies) http.Handler {
 	protected.HandleFunc("GET /api/plugins/custom_head", h.getCustomHead)
 	protected.HandleFunc("POST /api/plugins/custom_head", h.setCustomHead)
 	protected.HandleFunc("GET /api/store/plugins", h.localCatalog)
+	protected.HandleFunc("GET /api/store/plugin-files/{id}", h.downloadCatalogPlugin)
 	protected.HandleFunc("POST /api/store/plugins/{id}/install", h.installCatalogPlugin)
 	protected.HandleFunc("GET /api/hosts", h.getHosts)
 	protected.HandleFunc("POST /api/hosts", h.setHosts)
@@ -314,6 +315,47 @@ func (h *handler) localCatalog(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{
 		"source": "local", "plugins": []any{}, "remote_configured": h.deps.Config.PluginServerURL != "",
 	}})
+}
+
+func (h *handler) legacyPluginStore(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Catalog == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"res": map[string]any{"data": map[string]any{"content": []any{}}}, "download_url": "/api/store/plugin-files"})
+		return
+	}
+	items, err := h.deps.Catalog.List(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "plugin catalog unavailable"})
+		return
+	}
+	content := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		content = append(content, map[string]any{
+			"id": item.ID, "name": item.Name, "version": item.Version,
+			"description": item.Description, "author": item.Author, "size": item.Size,
+			"hash_info": map[string]string{"sha256": item.SHA256},
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"res":          map[string]any{"data": map[string]any{"content": content}},
+		"download_url": "/api/store/plugin-files",
+	})
+}
+
+func (h *handler) downloadCatalogPlugin(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Catalog == nil {
+		http.NotFound(w, r)
+		return
+	}
+	item, data, err := h.deps.Catalog.Download(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "plugin download or integrity check failed"})
+		return
+	}
+	w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+item.ID+`"`)
+	w.Header().Set("Digest", "sha-256="+item.SHA256)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
 }
 
 func (h *handler) installCatalogPlugin(w http.ResponseWriter, r *http.Request) {

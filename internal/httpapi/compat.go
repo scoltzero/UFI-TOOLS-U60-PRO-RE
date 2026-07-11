@@ -35,7 +35,7 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/log_clear", h.setKV("log_clear"))
 	mux.HandleFunc("GET /api/get_custom_head", h.legacyGetCustomHead)
 	mux.HandleFunc("POST /api/set_custom_head", h.legacySetCustomHead)
-	mux.HandleFunc("GET /api/plugins_store", h.localCatalog)
+	mux.HandleFunc("GET /api/plugins_store", h.legacyPluginStore)
 	mux.HandleFunc("GET /api/list_tasks", h.listSchedulers)
 	mux.HandleFunc("POST /api/add_task", h.setScheduler)
 	mux.HandleFunc("DELETE /api/remove_task/{id}", h.deleteScheduler)

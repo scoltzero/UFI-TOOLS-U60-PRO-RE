@@ -12,15 +12,25 @@ import (
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/catalog"
 )
 
+type stringsFlag []string
+
+func (s *stringsFlag) String() string { return fmt.Sprint([]string(*s)) }
+func (s *stringsFlag) Set(value string) error {
+	*s = append(*s, value)
+	return nil
+}
+
 func main() {
 	baseURL := flag.String("url", "", "legacy HTTPS store origin")
 	output := flag.String("output", "", "new self-hosted catalog directory")
+	var allowedDownloadHosts stringsFlag
+	flag.Var(&allowedDownloadHosts, "allow-download-host", "explicit HTTPS redirect host; repeat for multiple hosts")
 	flag.Parse()
 	if *baseURL == "" || *output == "" {
 		fmt.Fprintln(os.Stderr, "url and output are required")
 		os.Exit(2)
 	}
-	importer, err := catalog.NewLegacyImporter(*baseURL, nil)
+	importer, err := catalog.NewLegacyImporter(*baseURL, nil, allowedDownloadHosts...)
 	if err != nil {
 		fatal(err)
 	}

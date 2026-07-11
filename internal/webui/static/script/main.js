@@ -6207,7 +6207,8 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
     const installPluginFromStore = async (url, name) => {
         const { close, el } = createFixedToast('download_ing', t('download_ing'))
         try {
-            const res = await fetchWithTimeout(`${KANO_baseURL}/proxy/--${url}`, {
+			const fetchURL = url.startsWith('/') ? url : `${KANO_baseURL}/proxy/--${url}`
+            const res = await fetchWithTimeout(fetchURL, {
                 method: 'GET',
             })
             if (!res.ok) {
@@ -6244,12 +6245,12 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                             ${plugin.name}
                             </div>
                             <div class="info">
-                                <span>MD5:${plugin?.hash_info?.md5}</span><br>
+                                <span>SHA-256:${plugin?.hash_info?.sha256 || '由本地商店校验'}</span><br>
                                 <span>last-modified: ${new Date(plugin?.modified).toLocaleString('zh-cn')}</span>
                             </div>
                             <div class="actions">
-                                <button style="background:${exsits_plugin_index === -1 ? '' : 'var(--dark-btn-color-active)'}" onclick="installPluginFromStore('${download_url}/${plugin.name}','${plugin.name}')">${exsits_plugin_index === -1 ? t('one_click_install') : t('reinstall')}</button>
-                                <button onclick="downloadUrl('${download_url}/${plugin.name}')">${t('only_download')}</button>
+                                <button style="background:${exsits_plugin_index === -1 ? '' : 'var(--dark-btn-color-active)'}" onclick="installPluginFromStore('${download_url}/${plugin.id}','${plugin.name}')">${exsits_plugin_index === -1 ? t('one_click_install') : t('reinstall')}</button>
+                                <button onclick="downloadUrl('${download_url}/${plugin.id}')">${t('only_download')}</button>
                             </div>
                         `
             items_el.appendChild(li)

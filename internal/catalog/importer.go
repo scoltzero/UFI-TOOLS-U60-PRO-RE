@@ -22,8 +22,9 @@ import (
 )
 
 type LegacyImporter struct {
-	base   *url.URL
-	client *http.Client
+	base             *url.URL
+	client           *http.Client
+	allowedDownloads map[string]bool
 }
 
 type legacyPlugin struct {
@@ -39,7 +40,7 @@ type legacyPlugin struct {
 	} `json:"meta"`
 }
 
-func NewLegacyImporter(baseURL string, client *http.Client) (*LegacyImporter, error) {
+func NewLegacyImporter(baseURL string, client *http.Client, allowedDownloadHosts ...string) (*LegacyImporter, error) {
 	base, err := url.Parse(baseURL)
 	if err != nil || base.Host == "" || base.Scheme != "https" {
 		return nil, errors.New("legacy store must be an HTTPS origin")
@@ -47,10 +48,20 @@ func NewLegacyImporter(baseURL string, client *http.Client) (*LegacyImporter, er
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
 	}
+	allowed := map[string]bool{}
+	for _, host := range allowedDownloadHosts {
+		host = strings.ToLower(strings.TrimSpace(host))
+		if host == "" || strings.ContainsAny(host, "/:@") {
+			return nil, fmt.Errorf("invalid allowed download host %q", host)
+		}
+		allowed[host] = true
+	}
 	clientCopy := *client
 	clientCopy.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		if req.URL.Scheme != base.Scheme || !strings.EqualFold(req.URL.Host, base.Host) {
-			return errors.New("legacy store redirect changed origin")
+		sameOrigin := req.URL.Scheme == base.Scheme && strings.EqualFold(req.URL.Host, base.Host)
+		explicitHost := req.URL.Scheme == "https" && allowed[strings.ToLower(req.URL.Hostname())]
+		if !sameOrigin && !explicitHost {
+			return fmt.Errorf("legacy store redirect host %q is not explicitly allowed", req.URL.Hostname())
 		}
 		if len(via) > 5 {
 			return errors.New("too many legacy store redirects")
@@ -58,7 +69,7 @@ func NewLegacyImporter(baseURL string, client *http.Client) (*LegacyImporter, er
 		return nil
 	}
 	base.Path = strings.TrimSuffix(base.Path, "/")
-	return &LegacyImporter{base: base, client: &clientCopy}, nil
+	return &LegacyImporter{base: base, client: &clientCopy, allowedDownloads: allowed}, nil
 }
 
 func (i *LegacyImporter) Import(ctx context.Context, output string) (Manifest, error) {
