@@ -68,7 +68,7 @@ func Load() (Config, error) {
 	flags.StringVar(&cfg.PluginServerURL, "plugin-server-url", envString("UFI_PLUGIN_SERVER_URL", cfg.PluginServerURL), "optional plugin catalog base URL")
 	flags.StringVar(&cfg.PluginServerToken, "plugin-server-token", envString("UFI_PLUGIN_SERVER_TOKEN", cfg.PluginServerToken), "optional plugin catalog token")
 	flags.StringVar(&cfg.ResourceServerURL, "resource-server-url", envString("UFI_RESOURCE_SERVER_URL", cfg.ResourceServerURL), "optional resource base URL")
-	flags.StringVar(&cfg.DeviceBackend, "device-backend", envString("UFI_DEVICE_BACKEND", cfg.DeviceBackend), "simulator or zte-http")
+	flags.StringVar(&cfg.DeviceBackend, "device-backend", envString("UFI_DEVICE_BACKEND", cfg.DeviceBackend), "simulator, zte-http, or u60-ubus")
 	flags.StringVar(&cfg.DeviceBaseURL, "device-base-url", envString("UFI_DEVICE_BASE_URL", cfg.DeviceBaseURL), "ZTE device HTTP origin")
 	flags.StringVar(&cfg.DeviceSession, "device-session", envString("UFI_DEVICE_SESSION", cfg.DeviceSession), "optional U60 UBUS session")
 	deviceTimeout, err := time.ParseDuration(envString("UFI_DEVICE_HTTP_TIMEOUT", cfg.DeviceHTTPTimeout.String()))
@@ -227,11 +227,11 @@ func (c Config) Validate() error {
 	switch c.DeviceBackend {
 	case "simulator":
 		if c.DeviceBaseURL != "" {
-			return errors.New("device base URL requires the zte-http backend")
+			return errors.New("device base URL requires the zte-http or u60-ubus backend")
 		}
 	case "zte-http", "u60-ubus":
 		if c.DeviceBaseURL == "" {
-			return errors.New("zte-http backend requires a device base URL")
+			return errors.New("zte-http and u60-ubus backends require a device base URL")
 		}
 		deviceURL, err := url.Parse(c.DeviceBaseURL)
 		if err != nil || (deviceURL.Scheme != "http" && deviceURL.Scheme != "https") || deviceURL.Hostname() == "" {

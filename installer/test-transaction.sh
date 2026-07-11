@@ -11,8 +11,13 @@ trap 'UFI_INSTALL_ROOT="$ROOT" "$PROJECT_ROOT/installer/bundle/service.sh" stop 
 
 echo old > "$ROOT/version-marker"
 printf '%s\n' 'optional-tool' > "$ROOT/ttyd"
+printf '%s\n' '#!/bin/sh' 'while :; do sleep 60; done' > "$ROOT/ufi-tools-u60pro"
+chmod 0755 "$ROOT/ufi-tools-u60pro"
+"$ROOT/ufi-tools-u60pro" &
+OLD_PID=$!
+echo "$OLD_PID" > "$ROOT/ufi-tools-u60pro.pid"
 cp "$PROJECT_ROOT/installer/bundle/service.sh" "$BUNDLE/service.sh"
-printf '%s\n' '#!/bin/sh' 'while :; do sleep 60; done' > "$BUNDLE/ufi-tools-u60pro"
+printf '%s\n' '#!/bin/sh' 'env | sort > "$UFI_DATA_DIR/runtime-env"' 'while :; do sleep 60; done' > "$BUNDLE/ufi-tools-u60pro"
 printf '%s\n' '#!/bin/sh' 'exit 0' > "$BUNDLE/verify-release"
 printf '%s\n' '{}' > "$BUNDLE/manifest.json"
 printf '%s\n' 'test-key' > "$BUNDLE/public-key.hex"
@@ -20,9 +25,18 @@ printf '%s\n' '#!/bin/sh' 'exit "${FAKE_WGET_STATUS:-0}"' > "$TOOLS/wget"
 chmod 0755 "$BUNDLE/ufi-tools-u60pro" "$BUNDLE/verify-release" "$BUNDLE/service.sh" "$TOOLS/wget"
 
 PATH="$TOOLS:$PATH" UFI_INSTALL_ROOT="$ROOT" UFI_HEALTH_ATTEMPTS=1 "$BUNDLE/service.sh" install "$BUNDLE"
+if kill -0 "$OLD_PID" 2>/dev/null; then
+  echo "legacy service was not stopped" >&2
+  exit 1
+fi
 [ -x "$ROOT/ufi-tools-u60pro" ]
 [ -d "$ROOT/data" ]
 [ "$(cat "$ROOT/ttyd")" = optional-tool ]
+grep -q '^UFI_DEVICE_BACKEND=u60-ubus$' "$ROOT/data/runtime-env"
+grep -q '^UFI_DEVICE_BASE_URL=http://127.0.0.1$' "$ROOT/data/runtime-env"
+grep -q '^UFI_WORKERS_ENABLED=true$' "$ROOT/data/runtime-env"
+grep -q '^UFI_PRIVILEGED_COMPAT=true$' "$ROOT/data/runtime-env"
+grep -q '^UFI_AT_ENABLED=true$' "$ROOT/data/runtime-env"
 PATH="$TOOLS:$PATH" UFI_INSTALL_ROOT="$ROOT" "$ROOT/service.sh" stop
 
 echo rollback-source > "$ROOT/version-marker"

@@ -20,7 +20,7 @@ jobs:
       - run: go vet ./...
       - run: go mod verify
       - name: Scan reachable Go vulnerabilities
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+        run: make vuln
       - name: Collect dependency licenses
         run: ./scripts/collect-licenses.sh build/licenses
       - name: Build static ARM64 service

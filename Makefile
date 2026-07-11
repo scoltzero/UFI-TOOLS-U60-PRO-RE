@@ -1,10 +1,13 @@
-.PHONY: test lint build build-arm64 build-installers installer-test
+.PHONY: test lint vuln build build-arm64 build-installers installer-test
 
 test:
 	go list -e ./... | rg -v '/third_party/' | xargs go test
 
 lint:
 	go list -e ./... | rg -v '/third_party/' | xargs go vet
+
+vuln:
+	go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 $$(go list -e ./... | rg -v '/third_party/')
 
 build:
 	go build -buildvcs=false -trimpath -o bin/ufi-tools-u60pro ./cmd/ufi-tools-u60pro

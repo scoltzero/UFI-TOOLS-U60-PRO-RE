@@ -1,0 +1,4 @@
+<resources>
+    <string name="choose_container">选择 backup_restore.bin</string>
+    <string name="choose_rollback">选择已验证的回滚容器</string>
+</resources>

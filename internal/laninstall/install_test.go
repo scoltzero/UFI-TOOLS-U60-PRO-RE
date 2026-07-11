@@ -3,6 +3,7 @@
 package laninstall
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -22,6 +23,10 @@ func TestInstallDryRunAndAcknowledgement(t *testing.T) {
 	options.Execute = true
 	if _, err := client.Install(context.Background(), options); err == nil {
 		t.Fatal("expected acknowledgement error")
+	}
+	options.Acknowledged = true
+	if _, err := client.Install(context.Background(), options); err == nil {
+		t.Fatal("expected rollback-container error")
 	}
 }
 
@@ -78,10 +83,57 @@ func TestInstallSuccessfulWorkflow(t *testing.T) {
 	}
 	backupPath := filepath.Join(t.TempDir(), "original.bin")
 	result, err := client.Install(context.Background(), InstallOptions{
-		Container: []byte("candidate"), BackupPath: backupPath, HealthURL: server.URL + "/healthz",
+		Container: []byte("candidate"), RollbackContainer: []byte("rollback"), BackupPath: backupPath, HealthURL: server.URL + "/healthz",
 		Execute: true, Acknowledged: true, HealthTimeout: time.Second, RetryInterval: time.Millisecond,
 	})
 	if err != nil || !result.Healthy || !result.RestoreTriggered || result.RollbackAttempted {
 		t.Fatalf("Install() = %#v, %v", result, err)
 	}
+}
+
+func TestInstallWaitsForHealthyRollback(t *testing.T) {
+	var restoreCalls atomic.Int32
+	var healthCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ubus/":
+			body, _ := io.ReadAll(r.Body)
+			if len(body) == 0 {
+				t.Fatal("empty RPC")
+			}
+			if string(body) != "" && containsProcedure(body, "device_restore_proc") {
+				restoreCalls.Add(1)
+			}
+			io.WriteString(w, `[{"result":[0,{"result":"success"}]}]`)
+		case "/cgi-bin/cgi-upload":
+			io.WriteString(w, "checksum sha256sum")
+		case "/healthz":
+			call := healthCalls.Add(1)
+			if restoreCalls.Load() < 2 || call%2 == 1 {
+				w.WriteHeader(http.StatusServiceUnavailable)
+			} else {
+				w.WriteHeader(http.StatusOK)
+			}
+		}
+	}))
+	defer server.Close()
+	client, err := NewClient(server.URL, "", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := client.Install(context.Background(), InstallOptions{
+		Container: []byte("candidate"), RollbackContainer: []byte("rollback"),
+		BackupPath: filepath.Join(t.TempDir(), "rollback.bin"), HealthURL: server.URL + "/healthz",
+		Execute: true, Acknowledged: true, HealthTimeout: 15 * time.Millisecond, RetryInterval: time.Millisecond,
+	})
+	if err == nil || !result.RollbackAttempted || !result.RollbackTriggered || !result.RollbackHealthy {
+		t.Fatalf("Install() = %#v, %v", result, err)
+	}
+	if restoreCalls.Load() != 2 {
+		t.Fatalf("restore calls = %d, want 2", restoreCalls.Load())
+	}
+}
+
+func containsProcedure(body []byte, procedure string) bool {
+	return bytes.Contains(body, []byte(procedure))
 }

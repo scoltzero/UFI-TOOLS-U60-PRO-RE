@@ -13,12 +13,15 @@ mkdir -p "$OUT"
 cp bin/ufi-tools-u60pro-linux-arm64 "$OUT/ufi-tools-u60pro"
 cp bin/verify-release-linux-arm64 "$OUT/verify-release"
 cp installer/bundle/service.sh "$OUT/service.sh"
+cp bin/sendat-linux-arm64 "$OUT/sendat"
+cp bin/ufi-plugin-store-linux-arm64 "$OUT/ufi-plugin-store"
+cp -R plugin-store "$OUT/plugin-store"
 cp "$PUBLIC_KEY" "$OUT/public-key.hex"
 cp LICENSE NOTICE "$OUT/"
 ./scripts/collect-licenses.sh "$OUT/third-party-licenses"
 if [ -n "${TTYD_BINARY:-}" ]; then cp "$TTYD_BINARY" "$OUT/ttyd"; chmod 0755 "$OUT/ttyd"; fi
 if [ -n "${SPEEDTEST_BINARY:-}" ]; then cp "$SPEEDTEST_BINARY" "$OUT/speedtest"; chmod 0755 "$OUT/speedtest"; fi
-chmod 0755 "$OUT/ufi-tools-u60pro" "$OUT/verify-release" "$OUT/service.sh"
+chmod 0755 "$OUT/ufi-tools-u60pro" "$OUT/verify-release" "$OUT/service.sh" "$OUT/sendat" "$OUT/ufi-plugin-store"
 
 go run ./cmd/sign-release \
   -version "$VERSION" \

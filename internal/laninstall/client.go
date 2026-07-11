@@ -5,6 +5,7 @@ package laninstall
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,8 +19,9 @@ import (
 )
 
 const (
-	defaultSession = "00000000000000000000000000000000"
-	maxBackupSize  = 128 << 20
+	defaultSession     = "00000000000000000000000000000000"
+	webProcedureSource = "zwrt_web"
+	maxBackupSize      = 128 << 20
 )
 
 type Client struct {
@@ -51,6 +53,40 @@ func NewClient(baseURL, session string, client *http.Client) (*Client, error) {
 		}}
 	}
 	return &Client{base: base, session: session, http: client}, nil
+}
+
+func (c *Client) Login(ctx context.Context, password string) error {
+	if password == "" {
+		return errors.New("router password is empty")
+	}
+	info, err := c.call(ctx, defaultSession, "zwrt_web", "web_login_info", map[string]string{})
+	if err != nil {
+		return fmt.Errorf("read router login salt: %w", err)
+	}
+	salt, _ := info["zte_web_sault"].(string)
+	if salt == "" {
+		return errors.New("router login salt is missing")
+	}
+	first := sha256UpperHex(password)
+	digest := sha256UpperHex(first + salt)
+	loggedIn, err := c.call(ctx, defaultSession, "zwrt_web", "web_login", map[string]string{"password": digest})
+	if err != nil {
+		return fmt.Errorf("router login: %w", err)
+	}
+	if !zeroResult(loggedIn["result"]) {
+		return errors.New("router rejected the password")
+	}
+	session, _ := loggedIn["ubus_rpc_session"].(string)
+	if len(session) != 32 || strings.Trim(session, "0123456789abcdefABCDEF") != "" {
+		return errors.New("router login returned an invalid session")
+	}
+	c.session = session
+	return nil
+}
+
+func sha256UpperHex(value string) string {
+	digest := sha256.Sum256([]byte(value))
+	return strings.ToUpper(fmt.Sprintf("%x", digest))
 }
 
 func (c *Client) Backup(ctx context.Context) ([]byte, error) {
@@ -106,6 +142,15 @@ func (c *Client) Upload(ctx context.Context, backup []byte) error {
 	request.Header.Set("Origin", c.base.Scheme+"://"+c.base.Host)
 	request.Header.Set("Referer", c.base.Scheme+"://"+c.base.Host+"/")
 	request.Header.Set("X-Requested-With", "XMLHttpRequest")
+	request.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	request.Header.Set("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+	request.Header.Set("Cache-Control", "no-cache")
+	request.Header.Set("Pragma", "no-cache")
+	request.Header.Set("Upgrade-Insecure-Requests", "1")
+	request.Header.Set("User-Agent", "Mozilla/5.0 UFI-TOOLS-U60-PRO-RE")
+	if c.session != defaultSession {
+		request.AddCookie(&http.Cookie{Name: "webtoken", Value: c.session})
+	}
 	response, err := c.http.Do(request)
 	if err != nil {
 		return fmt.Errorf("upload restore container: %w", err)
@@ -130,25 +175,43 @@ func (c *Client) Restore(ctx context.Context) error {
 }
 
 func (c *Client) rpc(ctx context.Context, procedure string) error {
+	object, err := c.call(ctx, c.session, "zwrt_mc.device.manager", procedure, map[string]string{"procType": webProcedureSource})
+	if err != nil {
+		return err
+	}
+	value, _ := object["result"].(string)
+	if !strings.EqualFold(value, "success") {
+		return errors.New("UBUS operation failed")
+	}
+	return nil
+}
+
+func (c *Client) call(ctx context.Context, session, object, procedure string, arguments any) (map[string]any, error) {
 	payload := []map[string]any{{
 		"jsonrpc": "2.0", "id": 1, "method": "call",
-		"params": []any{c.session, "zwrt_mc.device.manager", procedure, map[string]string{"procType": "web"}},
+		"params": []any{session, object, procedure, arguments},
 	}}
 	encoded, _ := json.Marshal(payload)
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.resolve("/ubus/?t="+fmt.Sprint(time.Now().UnixMilli())), bytes.NewReader(encoded))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Z-Mode", "0")
 	request.Header.Set("Z-Tag", "")
+	request.Header.Set("Origin", c.base.Scheme+"://"+c.base.Host)
+	request.Header.Set("Referer", c.base.Scheme+"://"+c.base.Host+"/")
+	request.Header.Set("X-Requested-With", "XMLHttpRequest")
+	if session != defaultSession {
+		request.AddCookie(&http.Cookie{Name: "webtoken", Value: session})
+	}
 	response, err := c.http.Do(request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("UBUS returned %d", response.StatusCode)
+		return nil, fmt.Errorf("UBUS returned %d", response.StatusCode)
 	}
 	var result []struct {
 		Error  any   `json:"error"`
@@ -156,28 +219,28 @@ func (c *Client) rpc(ctx context.Context, procedure string) error {
 	}
 	decoder := json.NewDecoder(io.LimitReader(response.Body, 1<<20))
 	if err := decoder.Decode(&result); err != nil || len(result) != 1 || result[0].Error != nil {
-		return errors.New("invalid UBUS response")
+		return nil, errors.New("invalid UBUS response")
 	}
-	if !rpcSuccess(result[0].Result) {
-		return errors.New("UBUS operation failed")
+	if len(result[0].Result) < 2 {
+		return nil, errors.New("UBUS response is incomplete")
 	}
-	return nil
+	code, ok := result[0].Result[0].(float64)
+	objectResult, objectOK := result[0].Result[1].(map[string]any)
+	if !ok || code != 0 || !objectOK {
+		return nil, errors.New("UBUS call failed")
+	}
+	return objectResult, nil
 }
 
-func rpcSuccess(result []any) bool {
-	if len(result) < 2 {
+func zeroResult(value any) bool {
+	switch typed := value.(type) {
+	case string:
+		return typed == "0"
+	case float64:
+		return typed == 0
+	default:
 		return false
 	}
-	code, ok := result[0].(float64)
-	if !ok || code != 0 {
-		return false
-	}
-	object, ok := result[1].(map[string]any)
-	if !ok {
-		return false
-	}
-	value, _ := object["result"].(string)
-	return strings.EqualFold(value, "success")
 }
 
 func (c *Client) resolve(relative string) string {

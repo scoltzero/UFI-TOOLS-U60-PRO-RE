@@ -10,6 +10,7 @@ import (
 	"crypto/des"
 	"crypto/md5"
 	"crypto/rand"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,7 @@ const (
 	InnerArchiveName = "tmp/back_parameter_r1.tgz"
 	InnerDigestName  = "tmp/back_parameter_r.md5"
 	OutputName       = "backup_restore.bin"
+	deviceKeySuffix  = "zteSDX75*11Mbb2@1"
 )
 
 type File struct {
@@ -31,12 +33,17 @@ type File struct {
 
 type Builder struct {
 	Password []byte
+	IMEI     string
 	Rand     io.Reader
 	Now      func() time.Time
 }
 
 func (b Builder) Build(files []File) ([]byte, error) {
-	if len(b.Password) == 0 {
+	password := b.Password
+	if len(password) == 0 && validIMEI(b.IMEI) {
+		password = DevicePassword(b.IMEI)
+	}
+	if len(password) == 0 {
 		return nil, errors.New("backup password is required")
 	}
 	if len(files) == 0 {
@@ -62,7 +69,21 @@ func (b Builder) Build(files []File) ([]byte, error) {
 	if random == nil {
 		random = rand.Reader
 	}
-	return encryptOpenSSL3DES(outer, b.Password, random)
+	return encryptOpenSSL3DES(outer, password, random)
+}
+
+func DevicePassword(imei string) []byte { return []byte(imei + deviceKeySuffix) }
+
+func validIMEI(imei string) bool {
+	if len(imei) != 15 {
+		return false
+	}
+	for _, character := range imei {
+		if character < '0' || character > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func createTarGzip(files []File, timestamp time.Time) ([]byte, error) {
@@ -108,7 +129,7 @@ func encryptOpenSSL3DES(plaintext, password []byte, random io.Reader) ([]byte, e
 	if _, err := io.ReadFull(random, salt); err != nil {
 		return nil, err
 	}
-	keyMaterial := evpBytesToKey(password, salt, 32)
+	keyMaterial := evpBytesToKeySHA256(password, salt, 32)
 	block, err := des.NewTripleDESCipher(keyMaterial[:24])
 	if err != nil {
 		return nil, err
@@ -127,7 +148,7 @@ func decryptOpenSSL3DES(encrypted, password []byte) ([]byte, error) {
 	if len(encrypted) < 24 || !bytes.Equal(encrypted[:8], []byte("Salted__")) || (len(encrypted)-16)%des.BlockSize != 0 {
 		return nil, errors.New("invalid OpenSSL 3DES envelope")
 	}
-	keyMaterial := evpBytesToKey(password, encrypted[8:16], 32)
+	keyMaterial := evpBytesToKeySHA256(password, encrypted[8:16], 32)
 	block, err := des.NewTripleDESCipher(keyMaterial[:24])
 	if err != nil {
 		return nil, err
@@ -137,11 +158,11 @@ func decryptOpenSSL3DES(encrypted, password []byte) ([]byte, error) {
 	return pkcs7Unpad(plaintext, block.BlockSize())
 }
 
-func evpBytesToKey(password, salt []byte, size int) []byte {
+func evpBytesToKeySHA256(password, salt []byte, size int) []byte {
 	result := make([]byte, 0, size)
 	var previous []byte
 	for len(result) < size {
-		hash := md5.New()
+		hash := sha256.New()
 		hash.Write(previous)
 		hash.Write(password)
 		hash.Write(salt)

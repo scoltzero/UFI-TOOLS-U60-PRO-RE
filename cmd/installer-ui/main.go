@@ -75,11 +75,36 @@ func (s *server) install(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("container is too large"))
 		return
 	}
+	var rollback []byte
+	if rollbackFile, _, rollbackErr := r.FormFile("rollback_container"); rollbackErr == nil {
+		defer rollbackFile.Close()
+		rollback, err = io.ReadAll(io.LimitReader(rollbackFile, maxUpload+1))
+		if err != nil || len(rollback) > maxUpload {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("rollback container is too large"))
+			return
+		}
+	}
 	base := strings.TrimSpace(r.FormValue("base"))
-	client, err := laninstall.NewClient(base, strings.TrimSpace(r.FormValue("session")), nil)
+	session := strings.TrimSpace(r.FormValue("session"))
+	password := r.FormValue("router_password")
+	if session != "" && password != "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("use either a UBUS session or router password, not both"))
+		return
+	}
+	if r.FormValue("execute") == "yes" && session == "" && password == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("execution requires the router password or an authorized UBUS session"))
+		return
+	}
+	client, err := laninstall.NewClient(base, session, nil)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
+	}
+	if password != "" && r.FormValue("execute") == "yes" {
+		if err := client.Login(r.Context(), password); err != nil {
+			writeError(w, http.StatusUnauthorized, err)
+			return
+		}
 	}
 	parsed, _ := url.Parse(base)
 	health := parsed.Scheme + "://" + net.JoinHostPort(parsed.Hostname(), "2333") + "/healthz"
@@ -95,7 +120,7 @@ func (s *server) install(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Minute)
 	defer cancel()
 	result, installErr := client.Install(ctx, laninstall.InstallOptions{
-		Container: container, BackupPath: filepath.Join(backupDir, "back_parameter-"+time.Now().UTC().Format("20060102T150405Z")+".bin"),
+		Container: container, RollbackContainer: rollback, BackupPath: filepath.Join(backupDir, "rollback-"+time.Now().UTC().Format("20060102T150405Z")+".bin"),
 		HealthURL: health, Execute: r.FormValue("execute") == "yes", Acknowledged: r.FormValue("ack") == "RESTORE U60 PRO",
 	})
 	status := http.StatusOK
@@ -134,4 +159,4 @@ func openBrowser(target string) {
 	_ = command.Start()
 }
 
-const page = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>U60 Pro 开源安装器</title><style>body{font:16px system-ui;background:#10151d;color:#edf2f7;margin:0}main{max-width:720px;margin:5vh auto;padding:28px;background:#18212d;border-radius:18px}label{display:block;margin:18px 0 7px}input,button{box-sizing:border-box;width:100%;padding:12px;border-radius:9px;border:1px solid #445;background:#0d131b;color:white}button{background:#1976d2;border:0;font-weight:700;margin-top:20px}small{color:#aab7c4}.danger{border:1px solid #b94a48;padding:14px;border-radius:10px}pre{white-space:pre-wrap;background:#090d12;padding:14px;border-radius:9px}</style><main><h1>U60 Pro 开源安装器</h1><p>默认只预览。执行时先保存原厂备份；候选服务未经历下线并恢复健康会触发原备份回滚。</p><form id="form"><input type="hidden" name="csrf" value="{{CSRF}}"><label>设备管理地址</label><input name="base" value="http://192.168.0.1" required><label>UBUS 会话（无登录时留空）</label><input name="session" maxlength="32"><label>backup_restore.bin</label><input type="file" name="container" required><label><input type="checkbox" name="execute" value="yes" style="width:auto"> 执行设备恢复</label><div class="danger"><label>执行确认（输入 RESTORE U60 PRO）</label><input name="ack" autocomplete="off"><small>恢复会重启并修改设备。请保持供电和局域网连接。</small></div><button>开始</button></form><pre id="out">等待操作</pre></main><script>form.onsubmit=async e=>{e.preventDefault();out.textContent='处理中，请勿断电…';try{let r=await fetch('/install',{method:'POST',body:new FormData(form)});out.textContent=JSON.stringify(await r.json(),null,2)}catch(e){out.textContent=e.message}}</script></html>`
+const page = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>U60 Pro 开源安装器</title><style>body{font:16px system-ui;background:#10151d;color:#edf2f7;margin:0}main{max-width:720px;margin:5vh auto;padding:28px;background:#18212d;border-radius:18px}label{display:block;margin:18px 0 7px}input,button{box-sizing:border-box;width:100%;padding:12px;border-radius:9px;border:1px solid #445;background:#0d131b;color:white}button{background:#1976d2;border:0;font-weight:700;margin-top:20px}small{color:#aab7c4}.danger{border:1px solid #b94a48;padding:14px;border-radius:10px}pre{white-space:pre-wrap;background:#090d12;padding:14px;border-radius:9px}</style><main><h1>U60 Pro 开源安装器</h1><p>默认只预览。执行必须提供能恢复当前服务与 rc.local 的已验证回滚容器；候选或回滚未恢复健康都会明确报错。</p><form id="form"><input type="hidden" name="csrf" value="{{CSRF}}"><label>设备管理地址</label><input name="base" value="http://192.168.98.1" required><label>路由器 Web 密码（推荐；不保存）</label><input type="password" name="router_password" autocomplete="current-password"><label>已有 UBUS 会话（与密码二选一）</label><input name="session" maxlength="32" autocomplete="off"><label>候选 backup_restore.bin</label><input type="file" name="container" required><label>匹配当前设备状态的回滚容器（执行时必选）</label><input type="file" name="rollback_container"><label><input type="checkbox" name="execute" value="yes" style="width:auto"> 执行设备恢复</label><div class="danger"><label>执行确认（输入 RESTORE U60 PRO）</label><input name="ack" autocomplete="off"><small>恢复会重启并修改设备。请保持供电和局域网连接。</small></div><button>开始</button></form><pre id="out">等待操作</pre></main><script>form.onsubmit=async e=>{e.preventDefault();out.textContent='处理中，请勿断电…';try{let r=await fetch('/install',{method:'POST',body:new FormData(form)});out.textContent=JSON.stringify(await r.json(),null,2)}catch(e){out.textContent=e.message}}</script></html>`

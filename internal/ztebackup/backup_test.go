@@ -52,6 +52,20 @@ func TestRejectUnsafePath(t *testing.T) {
 	}
 }
 
+func TestDevicePasswordAndIMEIValidation(t *testing.T) {
+	builder := Builder{IMEI: "123456789012345", Rand: bytes.NewReader([]byte("12345678")), Now: func() time.Time { return time.Unix(1, 0) }}
+	encrypted, err := builder.Build([]File{{Path: "data/test", Data: []byte("ok")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := decryptOpenSSL3DES(encrypted, DevicePassword(builder.IMEI)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (Builder{IMEI: "invalid"}).Build([]File{{Path: "data/test", Data: []byte("ok")}}); err == nil {
+		t.Fatal("expected invalid IMEI rejection")
+	}
+}
+
 func readTarGzip(t *testing.T, data []byte) map[string][]byte {
 	t.Helper()
 	gzipReader, err := gzip.NewReader(bytes.NewReader(data))

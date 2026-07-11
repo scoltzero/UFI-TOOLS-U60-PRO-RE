@@ -26,3 +26,5 @@
 *private-key*.hex
 release-public-key.hex
 /third_party/UFI-TOOLS/
+/installer/android/.gradle/
+/installer/android/app/build/

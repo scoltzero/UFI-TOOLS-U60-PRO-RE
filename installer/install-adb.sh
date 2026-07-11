@@ -56,11 +56,15 @@ for file in manifest.json ufi-tools-u60pro verify-release public-key.hex service
   # shellcheck disable=SC2086
   $ADB_TARGET push "$BUNDLE/$file" "$REMOTE/$file" >/dev/null
 done
-for file in ttyd speedtest; do
+for file in ttyd speedtest sendat ufi-plugin-store; do
   if [ -f "$BUNDLE/$file" ]; then
     # shellcheck disable=SC2086
     $ADB_TARGET push "$BUNDLE/$file" "$REMOTE/$file" >/dev/null
   fi
 done
+if [ -d "$BUNDLE/plugin-store" ]; then
+  # shellcheck disable=SC2086
+  $ADB_TARGET push "$BUNDLE/plugin-store" "$REMOTE/plugin-store" >/dev/null
+fi
 # shellcheck disable=SC2086
 $ADB_TARGET shell "chmod 0755 '$REMOTE/ufi-tools-u60pro' '$REMOTE/verify-release' '$REMOTE/service.sh' '$REMOTE/ttyd' '$REMOTE/speedtest' 2>/dev/null || true; '$REMOTE/service.sh' install '$REMOTE'"
