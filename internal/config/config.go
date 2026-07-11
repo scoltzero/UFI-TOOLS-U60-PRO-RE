@@ -35,6 +35,9 @@ type Config struct {
 	DeviceBackend      string
 	DeviceBaseURL      string
 	DeviceHTTPTimeout  time.Duration
+	WorkersEnabled     bool
+	SchedulerInterval  time.Duration
+	CellularInterval   time.Duration
 }
 
 func Load() (Config, error) {
@@ -57,6 +60,17 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("UFI_DEVICE_HTTP_TIMEOUT: %w", err)
 	}
 	flags.DurationVar(&cfg.DeviceHTTPTimeout, "device-http-timeout", deviceTimeout, "ZTE HTTP request timeout")
+	flags.BoolVar(&cfg.WorkersEnabled, "workers", envBool("UFI_WORKERS_ENABLED", cfg.WorkersEnabled), "enable scheduler and cellular workers")
+	schedulerInterval, err := time.ParseDuration(envString("UFI_SCHEDULER_INTERVAL", cfg.SchedulerInterval.String()))
+	if err != nil {
+		return Config{}, fmt.Errorf("UFI_SCHEDULER_INTERVAL: %w", err)
+	}
+	flags.DurationVar(&cfg.SchedulerInterval, "scheduler-interval", schedulerInterval, "scheduler polling interval")
+	cellularInterval, err := time.ParseDuration(envString("UFI_CELLULAR_INTERVAL", cfg.CellularInterval.String()))
+	if err != nil {
+		return Config{}, fmt.Errorf("UFI_CELLULAR_INTERVAL: %w", err)
+	}
+	flags.DurationVar(&cfg.CellularInterval, "cellular-interval", cellularInterval, "cellular sample interval")
 	skew, err := time.ParseDuration(envString("UFI_SIGN_CLOCK_SKEW", cfg.SignClockSkew.String()))
 	if err != nil {
 		return Config{}, fmt.Errorf("UFI_SIGN_CLOCK_SKEW: %w", err)
@@ -82,6 +96,8 @@ func Defaults() Config {
 		ResourceServerURL: "",
 		DeviceBackend:     "simulator",
 		DeviceHTTPTimeout: 5 * time.Second,
+		SchedulerInterval: 5 * time.Second,
+		CellularInterval:  5 * time.Minute,
 	}
 }
 
@@ -105,6 +121,12 @@ func (c Config) Validate() error {
 	}
 	if c.DeviceHTTPTimeout <= 0 || c.DeviceHTTPTimeout > time.Minute {
 		return errors.New("device HTTP timeout must be between zero and one minute")
+	}
+	if c.SchedulerInterval < time.Second || c.SchedulerInterval > time.Hour {
+		return errors.New("scheduler interval must be between one second and one hour")
+	}
+	if c.CellularInterval < time.Second || c.CellularInterval > 24*time.Hour {
+		return errors.New("cellular interval must be between one second and 24 hours")
 	}
 	switch c.DeviceBackend {
 	case "simulator":

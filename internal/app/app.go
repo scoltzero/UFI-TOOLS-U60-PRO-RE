@@ -15,6 +15,7 @@ import (
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/httpapi"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/workers"
 )
 
 type App struct {
@@ -23,6 +24,8 @@ type App struct {
 	logger  *slog.Logger
 	store   *store.Store
 	server  *http.Server
+	workers *workers.Manager
+	cancel  context.CancelFunc
 }
 
 type Option func(*App)
@@ -61,6 +64,15 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    32 << 10,
 	}
+	if cfg.WorkersEnabled {
+		workerContext, cancel := context.WithCancel(context.Background())
+		app.cancel = cancel
+		app.workers = workers.New(workers.Config{
+			SchedulerInterval: cfg.SchedulerInterval,
+			CellularInterval:  cfg.CellularInterval,
+		}, db, deviceBackend, app.logger)
+		app.workers.Start(workerContext)
+	}
 	return app, nil
 }
 
@@ -80,4 +92,12 @@ func (a *App) ListenAndServe() error { return a.server.ListenAndServe() }
 
 func (a *App) Shutdown(ctx context.Context) error { return a.server.Shutdown(ctx) }
 
-func (a *App) Close() error { return a.store.Close() }
+func (a *App) Close() error {
+	if a.cancel != nil {
+		a.cancel()
+	}
+	if a.workers != nil {
+		a.workers.Stop()
+	}
+	return a.store.Close()
+}
