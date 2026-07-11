@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -44,6 +45,13 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/ttyd/status", h.ttydStatus)
 	mux.HandleFunc("POST /api/ttyd/start", h.ttydStart)
 	mux.HandleFunc("POST /api/ttyd/stop", h.ttydStop)
+	mux.HandleFunc("GET /api/adb/status", h.adbStatus)
+	mux.HandleFunc("POST /api/adb/mode", h.adbMode)
+	mux.HandleFunc("GET /api/adb_alive", h.adbStatus)
+	mux.HandleFunc("GET /api/adb_wifi_setting", h.getKV("adb_wifi_enabled", "false"))
+	mux.HandleFunc("POST /api/adb_wifi_setting", h.adbMode)
+	mux.HandleFunc("GET /api/get_official_web_password", h.getKV("official_web_password", ""))
+	mux.HandleFunc("POST /api/update_admin_pwd", h.setKV("official_web_password"))
 	mux.HandleFunc("POST /api/hosts_restore", h.restoreHosts)
 	mux.HandleFunc("GET /api/goform/goform_get_cmd_process", h.goFormGet)
 	mux.HandleFunc("POST /api/goform/goform_set_cmd_process", h.goFormSet)
@@ -65,8 +73,7 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 
 	for _, pattern := range []string{
 		"GET /api/SELinux", "GET /api/usb_status",
-		"GET /api/adb/status", "POST /api/adb/mode", "GET /api/adb_alive",
-		"POST /api/set_wakelock_status", "POST /api/update_admin_pwd",
+		"POST /api/set_wakelock_status",
 		"GET /api/wifi/qrcode", "POST /api/speedtest",
 		"GET /api/check_update", "POST /api/download_update", "GET /api/download_update_status",
 		"POST /api/install_update", "GET /api/auto_update/check_now",
@@ -292,4 +299,65 @@ func (h *handler) ttydStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: status})
+}
+
+func (h *handler) adbStatus(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Runner == nil {
+		writeJSON(w, http.StatusServiceUnavailable, envelope{Code: 503, Message: "system runner unavailable"})
+		return
+	}
+	result, err := h.deps.Runner.Run(r.Context(), "port=$(getprop service.adb.tcp.port 2>/dev/null); pid=$(pidof adbd 2>/dev/null); printf '%s\\n%s' \"$port\" \"$pid\"")
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "read ADB state"})
+		return
+	}
+	lines := strings.SplitN(result.Output, "\n", 2)
+	port := strings.TrimSpace(lines[0])
+	pid := ""
+	if len(lines) == 2 {
+		pid = strings.TrimSpace(lines[1])
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{
+		"enabled": port != "" && port != "-1" && port != "0", "port": port, "running": pid != "", "pid": pid,
+	}})
+}
+
+func (h *handler) adbMode(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Runner == nil {
+		writeJSON(w, http.StatusServiceUnavailable, envelope{Code: 503, Message: "system runner unavailable"})
+		return
+	}
+	var request struct {
+		Enabled  bool   `json:"enabled"`
+		Mode     string `json:"mode"`
+		Port     int    `json:"port"`
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(r, &request); err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid ADB mode"})
+		return
+	}
+	enabled := request.Enabled || strings.EqualFold(request.Mode, "tcp") || strings.EqualFold(request.Mode, "network")
+	port := request.Port
+	if port == 0 {
+		port = 5555
+	}
+	if port < 1024 || port > 65535 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "ADB port must be between 1024 and 65535"})
+		return
+	}
+	command := "setprop service.adb.tcp.port -1; stop adbd; start adbd"
+	if enabled {
+		command = "setprop service.adb.tcp.port " + strconv.Itoa(port) + "; stop adbd; start adbd"
+	}
+	result, err := h.deps.Runner.Run(r.Context(), command)
+	if err != nil || result.ExitCode != 0 {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "change ADB mode failed", Data: result})
+		return
+	}
+	_ = h.deps.Store.Set(r.Context(), "kv", "adb_wifi_enabled", strconv.FormatBool(enabled))
+	if request.Password != "" {
+		_ = h.deps.Store.Set(r.Context(), "kv", "official_web_password", request.Password)
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{"enabled": enabled, "port": port}})
 }

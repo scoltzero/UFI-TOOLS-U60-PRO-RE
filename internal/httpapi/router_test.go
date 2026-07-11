@@ -173,3 +173,31 @@ func TestExplicitLegacyShellRunner(t *testing.T) {
 		t.Fatalf("unexpected shell response: %d %s", recorder.Code, recorder.Body.String())
 	}
 }
+
+type fakeRunner struct {
+	lastCommand string
+	result      processrunner.Result
+}
+
+func (f *fakeRunner) Run(_ context.Context, command string) (processrunner.Result, error) {
+	f.lastCommand = command
+	return f.result, nil
+}
+
+func TestADBModeUsesFixedCommand(t *testing.T) {
+	db, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	runner := &fakeRunner{}
+	router := New(Dependencies{Config: config.Defaults(), Store: db, Device: device.NewSimulator(), Runner: runner})
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/adb/mode", strings.NewReader(`{"enabled":true,"port":5555}`)))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("unexpected response: %d %s", recorder.Code, recorder.Body.String())
+	}
+	if runner.lastCommand != "setprop service.adb.tcp.port 5555; stop adbd; start adbd" {
+		t.Fatalf("unexpected command: %q", runner.lastCommand)
+	}
+}

@@ -75,10 +75,7 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 			return nil, fmt.Errorf("configure plugin catalog: %w", err)
 		}
 	}
-	var runner processrunner.Runner
-	if cfg.LegacyShellEnabled {
-		runner = processrunner.LocalRunner{Timeout: cfg.ShellTimeout, MaxOutput: cfg.ShellMaxOutput}
-	}
+	var runner processrunner.Runner = processrunner.LocalRunner{Timeout: cfg.ShellTimeout, MaxOutput: cfg.ShellMaxOutput}
 	ttyd := &processrunner.Supervisor{
 		Binary:  cfg.TTYDBinary,
 		Args:    []string{"--port", fmt.Sprintf("%d", cfg.TTYDPort), "--writable", "/bin/sh"},
