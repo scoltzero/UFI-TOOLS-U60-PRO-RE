@@ -59,6 +59,15 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/download_update_status", h.updateStatus)
 	mux.HandleFunc("POST /api/install_update", h.updateInstall)
 	mux.HandleFunc("GET /api/auto_update/check_now", h.updateCheck)
+	mux.HandleFunc("GET /api/plugin/list", h.pluginList)
+	mux.HandleFunc("POST /api/plugin/install", h.pluginInstallAlias)
+	mux.HandleFunc("POST /api/plugin/download", h.pluginInstallAlias)
+	mux.HandleFunc("POST /api/plugin/uninstall", h.pluginUninstall)
+	mux.HandleFunc("GET /api/plugin/update/check", h.pluginUpdateCheck)
+	mux.HandleFunc("POST /api/plugin/update/download", h.pluginInstallAlias)
+	mux.HandleFunc("GET /api/plugin/notifications", h.emptyPluginEvents)
+	mux.HandleFunc("POST /api/plugin/notification/read", h.emptyPluginEvents)
+	mux.HandleFunc("GET /api/plugin/changelog", h.emptyPluginEvents)
 	mux.HandleFunc("POST /api/hosts_restore", h.restoreHosts)
 	mux.HandleFunc("GET /api/goform/goform_get_cmd_process", h.goFormGet)
 	mux.HandleFunc("POST /api/goform/goform_set_cmd_process", h.goFormSet)
@@ -93,10 +102,6 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 		"POST /api/set_wakelock_status",
 		"GET /api/wifi/qrcode", "POST /api/speedtest",
 		"POST /api/upload_img", "DELETE /api/delete_img",
-		"GET /api/plugin/list", "GET /api/plugin/changelog", "GET /api/plugin/notifications",
-		"POST /api/plugin/notification/read", "GET /api/plugin/update/check",
-		"POST /api/plugin/update/download", "POST /api/plugin/download", "POST /api/plugin/install",
-		"POST /api/plugin/uninstall",
 		"GET /api/get_task", "POST /api/remove_task",
 		"GET /api/proxy/{path...}",
 	} {

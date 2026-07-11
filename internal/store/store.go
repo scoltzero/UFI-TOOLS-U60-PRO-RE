@@ -29,6 +29,11 @@ type CellularPoint struct {
 	Total     int64 `json:"total"`
 }
 
+type KeyValue struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 type Store struct {
 	db *sql.DB
 }
@@ -117,6 +122,34 @@ func (s *Store) Set(ctx context.Context, table, key, value string) error {
 		key, value,
 	)
 	return err
+}
+
+func (s *Store) Delete(ctx context.Context, table, key string) error {
+	if table != "config" && table != "kv" {
+		return errors.New("unsupported key/value table")
+	}
+	_, err := s.db.ExecContext(ctx, "DELETE FROM "+table+" WHERE key = ?", key)
+	return err
+}
+
+func (s *Store) ListPrefix(ctx context.Context, table, prefix string) ([]KeyValue, error) {
+	if table != "config" && table != "kv" {
+		return nil, errors.New("unsupported key/value table")
+	}
+	rows, err := s.db.QueryContext(ctx, "SELECT key, value FROM "+table+" WHERE key LIKE ? ORDER BY key", prefix+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []KeyValue
+	for rows.Next() {
+		var item KeyValue
+		if err := rows.Scan(&item.Key, &item.Value); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
 }
 
 func (s *Store) Ready(ctx context.Context) error {
