@@ -5,9 +5,9 @@ The project combines reusable MIT-licensed concepts from the upstream
 [kanoqwq/UFI-TOOLS](https://github.com/kanoqwq/UFI-TOOLS) project with a
 clean-room reimplementation of device-specific observable behavior.
 
-> Status: implementation-complete pre-device-validation release candidate.
-> Development and tests intentionally run without touching a U60 Pro; physical
-> installation remains a separate authorization and validation gate.
+> Status: implementation-complete candidate with real-device read-only and
+> backup-format calibration. Destructive installation/reboot/rollback
+> validation remains an explicit authorized-device gate.
 
 ## Goals
 

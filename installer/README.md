@@ -12,16 +12,20 @@ Both installation transports consume the same release bundle and transaction:
 
 `install-adb.sh` is the preferred authorized-ADB transport. It defaults to a
 dry run and does not contact a device unless `--execute` is passed. The LAN
-transport has the same dry-run default and implements original-backup capture,
-the official multipart upload and UBUS restore calls, restart-aware health
-checking, and automatic rollback. The container format still needs final
-calibration against an authorized real-device backup before production use.
+transport has the same dry-run default and implements the official multipart
+upload and UBUS restore calls, restart-aware health checking, a mandatory
+matching rollback container, and health-verified automatic rollback. Its
+encryption and archive format have been calibrated against an authorized
+real-device backup. CLI, Windows, and Android installers implement the official
+salted router-password login and authenticated `webtoken` upload flow;
+destructive restore acceptance is the remaining gate.
 
 Build and preview the LAN transport with:
 
 ```sh
-go run ./cmd/install-lan --base http://192.168.0.1 \
-  --container build/backup_restore.bin
+go run ./cmd/install-lan --base http://192.168.98.1 \
+  --container build/backup_restore.bin \
+  --rollback-container build/closed-rollback.bin
 ```
 
 ## Graphical installers
@@ -37,7 +41,7 @@ make build-installers
 
 The clean-room native Android project is under `installer/android`. It supports
 document selection, preview mode, explicit restore confirmation, app-private
-original backup storage, restart-aware health checks, and rollback. Build it
+rollback-container storage, restart-aware health checks, and verified rollback. Build it
 with JDK 17 and Android SDK 35 using `./gradlew :app:assembleDebug` from that
 directory. Signing and distribution are release concerns and are not performed
 by these commands.
@@ -55,7 +59,8 @@ VERSION=0.1.0 PRIVATE_KEY=/secure/private.hex PUBLIC_KEY=release-public-key.hex 
 `installer/test-transaction.sh` exercises the atomic swap and failure rollback
 entirely under a temporary directory with fake health and verifier commands.
 
-Optional open-source `ttyd` and speed-test binaries can be included without
+The ARM64 AT helper and self-hosted plugin-store service/catalog are included
+in the standard bundle. Optional open-source `ttyd` and speed-test binaries can be included without
 vendoring them in this repository:
 
 ```sh

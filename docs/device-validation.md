@@ -24,6 +24,26 @@ U60 Pro deployments should set `UFI_DEVICE_BACKEND=u60-ubus` and
 optional; the anonymous all-zero session supports the calibrated read-only
 procedures.
 
+## Backup-format calibration (2026-07-11)
+
+An authorized vendor backup generated on the same device was pulled without
+committing it to Git. Reverse analysis and a successful independent decrypt
+confirmed the device-bound password suffix, OpenSSL-compatible 3DES-CBC,
+SHA-256 EVP key/IV derivation, exact two-file outer archive, and inner MD5
+sidecar. The safe inspector accepted 169 regular files and two relative
+symlinks whose resolved targets remain inside the archive root.
+
+The open candidate container and a matching closed-service rollback container
+were generated and passed the same envelope, checksum, path-safety, and content
+manifest checks. Neither has yet been uploaded. The web interfaces remain
+reachable, while network ADB is offline and anonymous UBUS denies management
+procedures. Anonymous multipart upload also returns HTTP 405. Static analysis
+of the supplied installer confirmed that it performs the official salted
+two-pass SHA-256 router login, obtains `ubus_rpc_session`, and authenticates the
+upload with `Cookie: webtoken=<session>`; that flow is now independently
+implemented and covered by tests. Destructive restore waits for a router
+password/authorized session or a physically connected authorized ADB transport.
+
 ## Read-only baseline
 
 - Kernel: OpenWrt Linux 5.15, AArch64.

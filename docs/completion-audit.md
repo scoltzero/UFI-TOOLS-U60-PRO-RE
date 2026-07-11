@@ -17,22 +17,32 @@ publishing, and official release distribution.
 | APN/ADB/ttyd/hosts | U60 command contracts, fixed privileged commands, process supervision, atomic hosts rollback | Complete offline |
 | Updates | Ed25519 manifest, size/SHA-256, same-origin download, staging and transactional installer | Complete offline |
 | ADB installation | Dry-run default, architecture preflight, signed bundle and rollback transaction test | Complete offline |
-| LAN restore installation | Official backup RPC, download, multipart upload, restore RPC, down/up health proof and automatic original-backup rollback | Implemented; destructive restore not invoked |
-| Graphical installers | Native Android source and single-file Windows loopback Web UI using the shared transactional transport | Windows PE verified; Android source complete, local JDK/SDK unavailable |
+| LAN restore installation | Real backup decrypt/inspect, multipart upload, restore RPC, mandatory matching rollback container, candidate and rollback down/up health proof | Format calibrated; destructive restore not invoked |
+| Graphical installers | Native Android source and single-file Windows loopback Web UI using the shared transactional transport | Windows PE32+ verified; Android SDK 35 debug APK built, v2 signature and launchable Activity verified |
 | Proprietary material exclusion | Git ignore rules and repository search; APK/EXE/Qualcomm files absent | Complete |
 | Licensing | Full AGPL text, upstream MIT notice, automated dependency-license collection | Complete |
 | Toolchain security | Go 1.26.5 is required locally and in CI; `govulncheck@v1.6.0` reports zero reachable vulnerabilities | Complete |
 | CI | Tests, vet, module verification, vulnerability scan, ARM64 build and installer rollback workflow on merged `main` | Complete; run `29138245168` passed |
 
-## Remaining destructive/toolchain gates
+## Remaining destructive gate
 
 The ARM64 candidate was run safely from `/tmp` on port 2433 and its UBUS-backed
 device summary, legacy reads, complete UI, storage, and health endpoints were
 validated. The original service remained on port 2333 and all temporary files
 were removed afterward.
 
-Two gates remain intentionally unclaimed: accepting the generated restore
-container and proving rollback through an actual reboot would destructively
-modify the device; producing an APK requires JDK 17 and Android SDK 35, which
-are not installed on the current workstation. Neither is a release/publishing
-operation, but both require external state not available in this run.
+The user-owned vendor backup was decrypted with the calibrated device-bound
+password derivation. Its exact outer pair and inner MD5 passed, and all 171
+inner entries were inspected, including two contained relative symlinks. Both
+the open candidate and a matching closed-service rollback container were then
+generated and inspected offline.
+
+One gate remains intentionally unclaimed: accepting the candidate container,
+rebooting, proving candidate health, deliberately exercising rollback, and
+comparing the restored baseline. The device web interfaces are reachable, but
+network ADB is offline and anonymous UBUS correctly denies restore management
+operations; anonymous CGI upload returns HTTP 405. The independently tested
+official router-password login and `webtoken` upload flow is implemented in all
+installers. A router Web password, physically connected authorized ADB
+transport, or an authorized 32-character UBUS session is required before this
+destructive gate can run.

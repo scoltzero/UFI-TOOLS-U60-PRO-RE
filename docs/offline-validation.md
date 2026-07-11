@@ -8,7 +8,7 @@ make test
 make lint
 go list -e ./... | rg -v '/third_party/' | xargs go test -race
 go mod verify
-go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+make vuln
 make build-arm64
 make build-installers
 make installer-test
