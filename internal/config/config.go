@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -31,6 +32,9 @@ type Config struct {
 	PluginServerURL    string
 	ResourceServerURL  string
 	SignClockSkew      time.Duration
+	DeviceBackend      string
+	DeviceBaseURL      string
+	DeviceHTTPTimeout  time.Duration
 }
 
 func Load() (Config, error) {
@@ -46,6 +50,13 @@ func Load() (Config, error) {
 	flags.BoolVar(&cfg.LegacyShellEnabled, "legacy-shell", envBool("UFI_LEGACY_SHELL", cfg.LegacyShellEnabled), "enable legacy shell endpoint")
 	flags.StringVar(&cfg.PluginServerURL, "plugin-server-url", envString("UFI_PLUGIN_SERVER_URL", cfg.PluginServerURL), "optional plugin catalog base URL")
 	flags.StringVar(&cfg.ResourceServerURL, "resource-server-url", envString("UFI_RESOURCE_SERVER_URL", cfg.ResourceServerURL), "optional resource base URL")
+	flags.StringVar(&cfg.DeviceBackend, "device-backend", envString("UFI_DEVICE_BACKEND", cfg.DeviceBackend), "simulator or zte-http")
+	flags.StringVar(&cfg.DeviceBaseURL, "device-base-url", envString("UFI_DEVICE_BASE_URL", cfg.DeviceBaseURL), "ZTE device HTTP origin")
+	deviceTimeout, err := time.ParseDuration(envString("UFI_DEVICE_HTTP_TIMEOUT", cfg.DeviceHTTPTimeout.String()))
+	if err != nil {
+		return Config{}, fmt.Errorf("UFI_DEVICE_HTTP_TIMEOUT: %w", err)
+	}
+	flags.DurationVar(&cfg.DeviceHTTPTimeout, "device-http-timeout", deviceTimeout, "ZTE HTTP request timeout")
 	skew, err := time.ParseDuration(envString("UFI_SIGN_CLOCK_SKEW", cfg.SignClockSkew.String()))
 	if err != nil {
 		return Config{}, fmt.Errorf("UFI_SIGN_CLOCK_SKEW: %w", err)
@@ -69,6 +80,8 @@ func Defaults() Config {
 		SignClockSkew:     5 * time.Minute,
 		PluginServerURL:   "",
 		ResourceServerURL: "",
+		DeviceBackend:     "simulator",
+		DeviceHTTPTimeout: 5 * time.Second,
 	}
 }
 
@@ -89,6 +102,30 @@ func (c Config) Validate() error {
 	}
 	if c.LegacyShellEnabled && !c.LegacyAuthEnabled {
 		return errors.New("legacy shell requires legacy authentication")
+	}
+	if c.DeviceHTTPTimeout <= 0 || c.DeviceHTTPTimeout > time.Minute {
+		return errors.New("device HTTP timeout must be between zero and one minute")
+	}
+	switch c.DeviceBackend {
+	case "simulator":
+		if c.DeviceBaseURL != "" {
+			return errors.New("device base URL requires the zte-http backend")
+		}
+	case "zte-http":
+		if c.DeviceBaseURL == "" {
+			return errors.New("zte-http backend requires a device base URL")
+		}
+		deviceURL, err := url.Parse(c.DeviceBaseURL)
+		if err != nil || (deviceURL.Scheme != "http" && deviceURL.Scheme != "https") || deviceURL.Hostname() == "" {
+			return errors.New("device base URL must be an HTTP(S) origin")
+		}
+		host := deviceURL.Hostname()
+		ip := net.ParseIP(host)
+		if !strings.EqualFold(host, "localhost") && (ip == nil || !(ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast())) {
+			return errors.New("device base URL must use a literal private, loopback, or link-local address")
+		}
+	default:
+		return fmt.Errorf("unsupported device backend %q", c.DeviceBackend)
 	}
 	return nil
 }

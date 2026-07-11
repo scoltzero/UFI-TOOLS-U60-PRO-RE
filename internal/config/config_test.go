@@ -17,6 +17,18 @@ func TestDefaultsAreSafe(t *testing.T) {
 	}
 }
 
+func TestZTEBackendRequiresExplicitURL(t *testing.T) {
+	cfg := Defaults()
+	cfg.DeviceBackend = "zte-http"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected missing URL failure")
+	}
+	cfg.DeviceBaseURL = "http://192.168.0.1"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected explicit backend to validate: %v", err)
+	}
+}
+
 func TestShellRequiresLegacyAuthentication(t *testing.T) {
 	cfg := Defaults()
 	cfg.LegacyShellEnabled = true

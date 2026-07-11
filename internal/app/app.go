@@ -44,11 +44,16 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 		return nil, err
 	}
 	app.store = db
+	deviceBackend, err := buildDevice(cfg)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
 
 	app.server = &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.New(httpapi.Dependencies{
-			Config: cfg, Store: db, Device: device.NewSimulator(), Logger: app.logger, Version: app.version,
+			Config: cfg, Store: db, Device: deviceBackend, Logger: app.logger, Version: app.version,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
@@ -57,6 +62,18 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 		MaxHeaderBytes:    32 << 10,
 	}
 	return app, nil
+}
+
+func buildDevice(cfg config.Config) (device.Device, error) {
+	switch cfg.DeviceBackend {
+	case "simulator":
+		return device.NewSimulator(), nil
+	case "zte-http":
+		client := &http.Client{Timeout: cfg.DeviceHTTPTimeout}
+		return device.NewZTEHTTP(cfg.DeviceBaseURL, client)
+	default:
+		return nil, fmt.Errorf("unsupported device backend %q", cfg.DeviceBackend)
+	}
 }
 
 func (a *App) ListenAndServe() error { return a.server.ListenAndServe() }
