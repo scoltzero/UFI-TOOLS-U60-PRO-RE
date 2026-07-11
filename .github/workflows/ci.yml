@@ -18,6 +18,9 @@ jobs:
           cache: true
       - run: go test ./...
       - run: go vet ./...
+      - run: go mod verify
+      - name: Collect dependency licenses
+        run: ./scripts/collect-licenses.sh build/licenses
       - name: Build static ARM64 service
         run: make build-arm64
       - name: Inspect artifact
