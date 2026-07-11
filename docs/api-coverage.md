@@ -15,15 +15,14 @@ Coverage is tracked by behavior rather than private implementation details.
 | Remote shell | Guarded stub | Disabled by default; no command runner configured |
 | Plugin custom head | Implemented | Four historical formats and size validation |
 | Plugin catalog | Local skeleton | Empty self-hosted catalog; no default remote |
-| Hosts | Planned | Persistence and apply/restore adapter |
-| Scheduler | Planned | SQLite schema present |
-| SMS forwarding | Planned | SQLite schema present |
-| Cellular history | Planned | SQLite schema present |
-| Uploads | Planned | SQLite schema present; request limit established |
+| Hosts | Persisted | Apply/restore device adapter remains gated |
+| Scheduler | Persisted | CRUD contract implemented; execution worker pending |
+| SMS forwarding | Persisted | Configuration contract implemented; worker pending |
+| Cellular history | Implemented | Bounded recent-point persistence/query |
+| Uploads | Implemented | SQLite blob storage, safe names, 1 MiB limit |
 | APN/cellular controls | Planned | Requires sanitized ZTE behavior fixtures |
 | ADB/ttyd lifecycle | Planned | Must be behind explicit process policy |
 | OTA | Verification implemented | Ed25519 manifest plus size and SHA-256 artifact check |
 
 “Simulated” means route behavior can be developed and tested without accessing
 a U60 Pro. It does not claim that the device adapter has been validated.
-

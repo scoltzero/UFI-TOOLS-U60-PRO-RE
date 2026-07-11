@@ -10,6 +10,9 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
@@ -57,6 +60,19 @@ func New(deps Dependencies) http.Handler {
 	protected.HandleFunc("GET /api/plugins/custom_head", h.getCustomHead)
 	protected.HandleFunc("POST /api/plugins/custom_head", h.setCustomHead)
 	protected.HandleFunc("GET /api/store/plugins", h.localCatalog)
+	protected.HandleFunc("GET /api/hosts", h.getHosts)
+	protected.HandleFunc("POST /api/hosts", h.setHosts)
+	protected.HandleFunc("POST /api/hosts/restore", h.restoreHosts)
+	protected.HandleFunc("GET /api/scheduler", h.listSchedulers)
+	protected.HandleFunc("POST /api/scheduler", h.setScheduler)
+	protected.HandleFunc("DELETE /api/scheduler/{id}", h.deleteScheduler)
+	protected.HandleFunc("GET /api/sms_forward_sms", h.getSMSForward)
+	protected.HandleFunc("POST /api/sms_forward_sms", h.setSMSForward)
+	protected.HandleFunc("GET /api/uploads", h.listUploads)
+	protected.HandleFunc("POST /api/upload_file", h.uploadFile)
+	protected.HandleFunc("GET /api/uploads/{name}", h.downloadUpload)
+	protected.HandleFunc("GET /api/cellular/recent", h.recentCellular)
+	protected.HandleFunc("POST /api/cellular/recent", h.recordCellular)
 
 	root := http.NewServeMux()
 	root.Handle("GET /healthz", public)
@@ -220,6 +236,176 @@ func (h *handler) localCatalog(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{
 		"source": "local", "plugins": []any{}, "remote_configured": h.deps.Config.PluginServerURL != "",
 	}})
+}
+
+func (h *handler) getHosts(w http.ResponseWriter, r *http.Request) {
+	value, err := h.deps.Store.Get(r.Context(), "kv", "hosts")
+	if errors.Is(err, sql.ErrNoRows) {
+		value = ""
+	} else if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "read hosts"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]string{"content": value}})
+}
+
+func (h *handler) setHosts(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Content string `json:"content"`
+	}
+	if err := decodeJSON(r, &request); err != nil || len(request.Content) > 256<<10 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid hosts content"})
+		return
+	}
+	if err := h.deps.Store.Set(r.Context(), "kv", "hosts", request.Content); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save hosts"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Message: "stored; device apply adapter is not configured"})
+}
+
+func (h *handler) restoreHosts(w http.ResponseWriter, r *http.Request) {
+	if err := h.deps.Store.Set(r.Context(), "kv", "hosts", ""); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "restore hosts"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0})
+}
+
+func (h *handler) listSchedulers(w http.ResponseWriter, r *http.Request) {
+	items, err := h.deps.Store.ListSchedulers(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "list schedulers"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: items})
+}
+
+func (h *handler) setScheduler(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		ID   string          `json:"id"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := decodeJSON(r, &request); err != nil || request.ID == "" || len(request.Data) == 0 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "id and data are required"})
+		return
+	}
+	if err := h.deps.Store.SetScheduler(r.Context(), request.ID, string(request.Data)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save scheduler"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0})
+}
+
+func (h *handler) deleteScheduler(w http.ResponseWriter, r *http.Request) {
+	if err := h.deps.Store.DeleteScheduler(r.Context(), r.PathValue("id")); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "delete scheduler"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0})
+}
+
+func (h *handler) getSMSForward(w http.ResponseWriter, r *http.Request) {
+	value, err := h.deps.Store.GetSMSForward(r.Context())
+	if errors.Is(err, sql.ErrNoRows) {
+		value = `{}`
+	} else if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "read SMS forwarding"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: json.RawMessage(value)})
+}
+
+func (h *handler) setSMSForward(w http.ResponseWriter, r *http.Request) {
+	var value json.RawMessage
+	if err := decodeJSON(r, &value); err != nil || len(value) == 0 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid SMS forwarding configuration"})
+		return
+	}
+	if err := h.deps.Store.SetSMSForward(r.Context(), string(value)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save SMS forwarding"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Message: "stored; forwarding worker is not configured"})
+}
+
+func (h *handler) uploadFile(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(1 << 20); err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid multipart upload"})
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "file is required"})
+		return
+	}
+	defer file.Close()
+	name := filepath.Base(header.Filename)
+	if name == "." || name == "" || strings.ContainsRune(name, '\x00') {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid file name"})
+		return
+	}
+	data, err := io.ReadAll(io.LimitReader(file, (1<<20)+1))
+	if err != nil || len(data) > 1<<20 {
+		writeJSON(w, http.StatusRequestEntityTooLarge, envelope{Code: 413, Message: "upload exceeds 1 MiB"})
+		return
+	}
+	if err := h.deps.Store.PutUpload(r.Context(), name, data); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save upload"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{"name": name, "size": len(data)}})
+}
+
+func (h *handler) listUploads(w http.ResponseWriter, r *http.Request) {
+	items, err := h.deps.Store.ListUploads(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "list uploads"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: items})
+}
+
+func (h *handler) downloadUpload(w http.ResponseWriter, r *http.Request) {
+	data, err := h.deps.Store.GetUpload(r.Context(), r.PathValue("name"))
+	if errors.Is(err, sql.ErrNoRows) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "read upload"})
+		return
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", `attachment; filename="download"`)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+func (h *handler) recordCellular(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Timestamp int64 `json:"ts"`
+		Total     int64 `json:"total"`
+	}
+	if err := decodeJSON(r, &request); err != nil || request.Timestamp <= 0 || request.Total < 0 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid cellular point"})
+		return
+	}
+	if err := h.deps.Store.RecordCellular(r.Context(), request.Timestamp, request.Total); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "record cellular point"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0})
+}
+
+func (h *handler) recentCellular(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	items, err := h.deps.Store.RecentCellular(r.Context(), limit)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "read cellular history"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: items})
 }
 
 func decodeJSON(r *http.Request, target any) error {

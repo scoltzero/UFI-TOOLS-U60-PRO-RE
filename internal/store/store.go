@@ -12,6 +12,21 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+type Scheduler struct {
+	ID   string `json:"id"`
+	Data string `json:"data"`
+}
+
+type Upload struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}
+
+type CellularPoint struct {
+	Timestamp int64 `json:"ts"`
+	Total     int64 `json:"total"`
+}
+
 type Store struct {
 	db *sql.DB
 }
@@ -106,4 +121,99 @@ func (s *Store) Ready(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	return s.Ping(ctx)
+}
+
+func (s *Store) ListSchedulers(ctx context.Context) ([]Scheduler, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT id, data FROM scheduler ORDER BY id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []Scheduler
+	for rows.Next() {
+		var item Scheduler
+		if err := rows.Scan(&item.ID, &item.Data); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) SetScheduler(ctx context.Context, id, data string) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO scheduler(id, data) VALUES (?, ?)
+		ON CONFLICT(id) DO UPDATE SET data=excluded.data`, id, data)
+	return err
+}
+
+func (s *Store) DeleteScheduler(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM scheduler WHERE id = ?", id)
+	return err
+}
+
+func (s *Store) GetSMSForward(ctx context.Context) (string, error) {
+	var data string
+	err := s.db.QueryRowContext(ctx, "SELECT data FROM sms_forward WHERE id = 1").Scan(&data)
+	return data, err
+}
+
+func (s *Store) SetSMSForward(ctx context.Context, data string) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO sms_forward(id, data) VALUES (1, ?)
+		ON CONFLICT(id) DO UPDATE SET data=excluded.data`, data)
+	return err
+}
+
+func (s *Store) PutUpload(ctx context.Context, name string, data []byte) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO uploads(name, data, size) VALUES (?, ?, ?)
+		ON CONFLICT(name) DO UPDATE SET data=excluded.data, size=excluded.size`, name, data, len(data))
+	return err
+}
+
+func (s *Store) GetUpload(ctx context.Context, name string) ([]byte, error) {
+	var data []byte
+	err := s.db.QueryRowContext(ctx, "SELECT data FROM uploads WHERE name = ?", name).Scan(&data)
+	return data, err
+}
+
+func (s *Store) ListUploads(ctx context.Context) ([]Upload, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT name, size FROM uploads ORDER BY name")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []Upload
+	for rows.Next() {
+		var item Upload
+		if err := rows.Scan(&item.Name, &item.Size); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) RecordCellular(ctx context.Context, timestamp, total int64) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO cellular_recent(ts, total) VALUES (?, ?)
+		ON CONFLICT(ts) DO UPDATE SET total=excluded.total`, timestamp, total)
+	return err
+}
+
+func (s *Store) RecentCellular(ctx context.Context, limit int) ([]CellularPoint, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 288
+	}
+	rows, err := s.db.QueryContext(ctx, "SELECT ts, total FROM cellular_recent ORDER BY ts DESC LIMIT ?", limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []CellularPoint
+	for rows.Next() {
+		var item CellularPoint
+		if err := rows.Scan(&item.Timestamp, &item.Total); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
 }
