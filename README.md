@@ -1,0 +1,40 @@
+# UFI-TOOLS-U60-PRO-RE
+
+An open, auditable UFI-TOOLS-compatible management service for the ZTE U60 Pro.
+The project combines reusable MIT-licensed concepts from the upstream
+[kanoqwq/UFI-TOOLS](https://github.com/kanoqwq/UFI-TOOLS) project with a
+clean-room reimplementation of device-specific observable behavior.
+
+> Status: active clean-room implementation. It is not ready for installation
+> on a device. Development and tests currently run without touching a U60 Pro.
+
+## Goals
+
+- Run as a static Linux/ARM64 service with an embedded web interface.
+- Preserve useful legacy API and plugin compatibility where practical.
+- Support a self-hosted plugin store and independently signed updates.
+- Provide reproducible ADB and LAN-backup installers with safe rollback.
+- Remove opaque telemetry, remote blacklist/kill-switch behavior, and reliance
+  on a third-party control plane.
+
+## Non-goals
+
+- Redistributing the closed U60 Pro build or its decompiled source.
+- Redistributing Qualcomm tools, drivers, loaders, or firmware.
+- Bypassing device ownership, access controls, or carrier restrictions.
+- Claiming source-level equivalence with the closed implementation.
+
+## Repository policy
+
+Only independently written source, public protocol facts, tests, and properly
+attributed open-source code belong here. Research inputs stay outside Git and
+are represented by sanitized behavior specifications and test fixtures.
+
+See [Architecture](docs/architecture.md), [Clean-room policy](docs/clean-room.md),
+and [Threat model](docs/threat-model.md).
+
+## License
+
+New code is licensed under `AGPL-3.0-or-later`. Reused upstream UFI-TOOLS code
+retains its MIT license. See `LICENSE`, `LICENSES/`, and `NOTICE`.
+

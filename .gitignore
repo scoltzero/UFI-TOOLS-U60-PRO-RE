@@ -1,0 +1,26 @@
+.DS_Store
+.idea/
+.vscode/
+.env
+*.log
+*.db
+*.sqlite
+*.sqlite3
+/bin/
+/build/
+/dist/
+/coverage/
+/tmp/
+/vendor/
+
+# Research inputs and proprietary binaries must never be committed.
+/research-inputs/
+/artifacts/private/
+*.apk
+*.exe
+*.elf
+*.bin
+*.mbn
+*.hex
+*.img
+
