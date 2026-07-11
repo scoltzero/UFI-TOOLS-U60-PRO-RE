@@ -42,7 +42,8 @@ go run ./cmd/ufi-tools-u60pro --data-dir "$PWD/tmp/data" --http-addr 127.0.0.1:2
 ```
 
 Open `http://127.0.0.1:2333`. The development service uses a deterministic U60
-Pro simulator and never falls through to a connected device.
+Pro simulator and never falls through to a connected device. On first start it
+generates a token in `tmp/data/device-token`; enter that token in the web UI.
 
 Build the target binaries with `make build-arm64`. Installation is documented
 under `installer/`; its ADB transport is dry-run-only unless `--execute` is

@@ -48,6 +48,19 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 		return nil, err
 	}
 	app.store = db
+	if cfg.DeviceToken == "" {
+		generated, err := db.StableID(context.Background(), "device_token")
+		if err != nil {
+			db.Close()
+			return nil, fmt.Errorf("generate device token: %w", err)
+		}
+		cfg.DeviceToken = generated
+		app.cfg = cfg
+		if err := os.WriteFile(filepath.Join(cfg.DataDir, "device-token"), []byte(generated+"\n"), 0o600); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("write device token file: %w", err)
+		}
+	}
 	deviceBackend, err := buildDevice(cfg)
 	if err != nil {
 		db.Close()
