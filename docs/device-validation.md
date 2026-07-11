@@ -4,6 +4,26 @@ This document contains sanitized, non-secret facts gathered from the
 user-owned test device. Raw configuration, binaries and responses remain under
 the Git-ignored `research-inputs/` directory.
 
+## Authorized UBUS calibration (2026-07-11)
+
+The connected U60 Pro exposes its official management API through OpenWrt
+`uhttpd` `/ubus`, not the older ZTE `/goform` CGI transport. The dedicated
+`u60-ubus` backend was calibrated against the device's public web assets and
+live read-only responses for device manager, network information, SIM state,
+and router status.
+
+A static ARM64 candidate ran from `/tmp` on loopback port 2433 without replacing
+the installed service or changing boot configuration. Health, the complete
+embedded UI, device/version summaries, and legacy multi-key reads all returned
+HTTP 200 through an ADB forward. The live response reported SA network type and
+signal level 4. Device identifiers and the temporary candidate token were not
+recorded.
+
+U60 Pro deployments should set `UFI_DEVICE_BACKEND=u60-ubus` and
+`UFI_DEVICE_BASE_URL=http://127.0.0.1`. A logged-in 32-character UBUS session is
+optional; the anonymous all-zero session supports the calibrated read-only
+procedures.
+
 ## Read-only baseline
 
 - Kernel: OpenWrt Linux 5.15, AArch64.

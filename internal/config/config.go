@@ -35,6 +35,7 @@ type Config struct {
 	SignClockSkew      time.Duration
 	DeviceBackend      string
 	DeviceBaseURL      string
+	DeviceSession      string
 	DeviceHTTPTimeout  time.Duration
 	WorkersEnabled     bool
 	SchedulerInterval  time.Duration
@@ -69,6 +70,7 @@ func Load() (Config, error) {
 	flags.StringVar(&cfg.ResourceServerURL, "resource-server-url", envString("UFI_RESOURCE_SERVER_URL", cfg.ResourceServerURL), "optional resource base URL")
 	flags.StringVar(&cfg.DeviceBackend, "device-backend", envString("UFI_DEVICE_BACKEND", cfg.DeviceBackend), "simulator or zte-http")
 	flags.StringVar(&cfg.DeviceBaseURL, "device-base-url", envString("UFI_DEVICE_BASE_URL", cfg.DeviceBaseURL), "ZTE device HTTP origin")
+	flags.StringVar(&cfg.DeviceSession, "device-session", envString("UFI_DEVICE_SESSION", cfg.DeviceSession), "optional U60 UBUS session")
 	deviceTimeout, err := time.ParseDuration(envString("UFI_DEVICE_HTTP_TIMEOUT", cfg.DeviceHTTPTimeout.String()))
 	if err != nil {
 		return Config{}, fmt.Errorf("UFI_DEVICE_HTTP_TIMEOUT: %w", err)
@@ -227,7 +229,7 @@ func (c Config) Validate() error {
 		if c.DeviceBaseURL != "" {
 			return errors.New("device base URL requires the zte-http backend")
 		}
-	case "zte-http":
+	case "zte-http", "u60-ubus":
 		if c.DeviceBaseURL == "" {
 			return errors.New("zte-http backend requires a device base URL")
 		}
@@ -239,6 +241,9 @@ func (c Config) Validate() error {
 		ip := net.ParseIP(host)
 		if !strings.EqualFold(host, "localhost") && (ip == nil || !(ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast())) {
 			return errors.New("device base URL must use a literal private, loopback, or link-local address")
+		}
+		if c.DeviceBackend == "u60-ubus" && c.DeviceSession != "" && (len(c.DeviceSession) != 32 || strings.Trim(c.DeviceSession, "0123456789abcdefABCDEF") != "") {
+			return errors.New("U60 UBUS session must be 32 hexadecimal characters")
 		}
 	default:
 		return fmt.Errorf("unsupported device backend %q", c.DeviceBackend)

@@ -7,6 +7,11 @@ The target runtime is one static `linux/arm64` Go daemon installed under
 state in SQLite, exposes a compatibility API, and supervises optional local
 helpers such as `ttyd` on port `1146`.
 
+The device abstraction has deterministic simulator, traditional ZTE GoForm
+HTTP, and U60 Pro OpenWrt UBUS implementations. The UBUS adapter normalizes the
+official device-manager, network-info, SIM, and router-status objects into the
+stable fields consumed by the compatibility frontend.
+
 ```text
 browser / legacy plugin
           |
@@ -57,4 +62,3 @@ swap, installs a service entry, runs a health check, and rolls back on failure.
 A LAN backup/restore transport may be supplied for parity on devices where ADB
 bootstrap is unavailable. Both transports consume the same declarative bundle
 and transaction engine.
-

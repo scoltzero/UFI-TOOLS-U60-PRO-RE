@@ -131,6 +131,9 @@ func buildDevice(cfg config.Config) (device.Device, error) {
 	case "zte-http":
 		client := &http.Client{Timeout: cfg.DeviceHTTPTimeout}
 		return device.NewZTEHTTP(cfg.DeviceBaseURL, client)
+	case "u60-ubus":
+		client := &http.Client{Timeout: cfg.DeviceHTTPTimeout}
+		return device.NewU60UBUS(cfg.DeviceBaseURL, cfg.DeviceSession, client)
 	default:
 		return nil, fmt.Errorf("unsupported device backend %q", cfg.DeviceBackend)
 	}
