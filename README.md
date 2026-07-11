@@ -31,10 +31,24 @@ attributed open-source code belong here. Research inputs stay outside Git and
 are represented by sanitized behavior specifications and test fixtures.
 
 See [Architecture](docs/architecture.md), [Clean-room policy](docs/clean-room.md),
-and [Threat model](docs/threat-model.md).
+and [Threat model](docs/threat-model.md). Current endpoint coverage is tracked
+in [API coverage](docs/api-coverage.md).
+
+## Local development
+
+```sh
+go test ./...
+go run ./cmd/ufi-tools-u60pro --data-dir "$PWD/tmp/data" --http-addr 127.0.0.1:2333
+```
+
+Open `http://127.0.0.1:2333`. The development service uses a deterministic U60
+Pro simulator and never falls through to a connected device.
+
+Build the target binaries with `make build-arm64`. Installation is documented
+under `installer/`; its ADB transport is dry-run-only unless `--execute` is
+explicitly supplied.
 
 ## License
 
 New code is licensed under `AGPL-3.0-or-later`. Reused upstream UFI-TOOLS code
 retains its MIT license. See `LICENSE`, `LICENSES/`, and `NOTICE`.
-
