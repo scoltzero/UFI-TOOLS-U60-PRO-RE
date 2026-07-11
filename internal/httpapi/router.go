@@ -76,6 +76,7 @@ func New(deps Dependencies) http.Handler {
 	protected.HandleFunc("GET /api/uploads/{name}", h.downloadUpload)
 	protected.HandleFunc("GET /api/cellular/recent", h.recentCellular)
 	protected.HandleFunc("POST /api/cellular/recent", h.recordCellular)
+	h.registerCompatibilityRoutes(protected)
 
 	root := http.NewServeMux()
 	root.Handle("GET /healthz", public)

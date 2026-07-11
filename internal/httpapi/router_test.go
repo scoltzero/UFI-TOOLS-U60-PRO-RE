@@ -97,3 +97,37 @@ func TestStateCompatibilityRoutes(t *testing.T) {
 		}
 	}
 }
+
+func TestObservedCompatibilityPathsAreRegistered(t *testing.T) {
+	router := testRouter(t, "")
+	paths := []string{
+		"/api/SELinux", "/api/accept_terms", "/api/adb/mode", "/api/adb/status", "/api/adb_alive",
+		"/api/add_task", "/api/apn/all", "/api/apn/auto", "/api/apn/cid", "/api/apn/manual",
+		"/api/apn/manual/enable", "/api/apn/manual/enabled", "/api/apn/mode", "/api/auto_update/check_now",
+		"/api/auto_update/config", "/api/baseDeviceInfo", "/api/cellularUsage", "/api/check_update",
+		"/api/clear_task", "/api/connInfo", "/api/delete_all_uploads_data", "/api/delete_img",
+		"/api/device_id", "/api/device_uuid", "/api/download_update", "/api/download_update_status",
+		"/api/get_custom_head", "/api/get_log_status", "/api/get_res_server", "/api/get_task",
+		"/api/get_theme", "/api/goform/goform_get_cmd_process", "/api/goform/goform_set_cmd_process",
+		"/api/hasTTYD", "/api/hosts", "/api/hosts_restore", "/api/install_update", "/api/is_weak_token",
+		"/api/list_tasks", "/api/list_uploads", "/api/log_clear", "/api/plugin/changelog",
+		"/api/plugin/download", "/api/plugin/install", "/api/plugin/list", "/api/plugin/notification/read",
+		"/api/plugin/notifications", "/api/plugin/uninstall", "/api/plugin/update/check",
+		"/api/plugin/update/download", "/api/plugins_store", "/api/power_status_forward_enabled",
+		"/api/proxy/test", "/api/remove_task", "/api/run_shell", "/api/set_custom_head", "/api/set_log_status",
+		"/api/set_nickname", "/api/set_res_server", "/api/set_theme", "/api/set_token",
+		"/api/set_wakelock_status", "/api/sms_forward_blacklist", "/api/sms_forward_curl",
+		"/api/sms_forward_dingtalk", "/api/sms_forward_enabled", "/api/sms_forward_mail",
+		"/api/sms_forward_method", "/api/sms_forward_sms", "/api/speedtest", "/api/time/config",
+		"/api/time/status", "/api/time/sync", "/api/ttyd/start", "/api/ttyd/status", "/api/ttyd/stop",
+		"/api/update_admin_pwd", "/api/upload_file", "/api/upload_img", "/api/uploads/test",
+		"/api/usb_status", "/api/version_info", "/api/wifi/qrcode",
+	}
+	for _, path := range paths {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodOptions, path, nil))
+		if recorder.Code == http.StatusNotFound {
+			t.Errorf("observed path is not registered: %s", path)
+		}
+	}
+}

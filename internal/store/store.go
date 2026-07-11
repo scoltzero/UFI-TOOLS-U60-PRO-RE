@@ -4,7 +4,9 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -216,4 +218,28 @@ func (s *Store) RecentCellular(ctx context.Context, limit int) ([]CellularPoint,
 		result = append(result, item)
 	}
 	return result, rows.Err()
+}
+
+func (s *Store) DeleteAllUploads(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM uploads")
+	return err
+}
+
+func (s *Store) StableID(ctx context.Context, key string) (string, error) {
+	value, err := s.Get(ctx, "config", key)
+	if err == nil {
+		return value, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	random := make([]byte, 16)
+	if _, err := rand.Read(random); err != nil {
+		return "", err
+	}
+	value = hex.EncodeToString(random)
+	if err := s.Set(ctx, "config", key, value); err != nil {
+		return "", err
+	}
+	return value, nil
 }
