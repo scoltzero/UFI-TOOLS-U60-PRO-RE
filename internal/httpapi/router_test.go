@@ -110,6 +110,53 @@ func TestUpstreamFrontendResponseShapes(t *testing.T) {
 	}
 }
 
+func TestFrontendDataLimitContract(t *testing.T) {
+	router := testRouter(t, "")
+	set := httptest.NewRecorder()
+	router.ServeHTTP(set, httptest.NewRequest(http.MethodPost, "/api/set_data_limit", strings.NewReader(`{"data_flow_limit_enabled":"1","data_flow_max_limit":"1048576","data_flow_check_daily_or_monthly":"daily","data_check_reference":"android","data_limit_status_forward_enabled":true}`)))
+	if set.Code != http.StatusOK || !strings.Contains(set.Body.String(), `"result":"success"`) {
+		t.Fatalf("set data limit: %d %s", set.Code, set.Body.String())
+	}
+	get := httptest.NewRecorder()
+	router.ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/api/get_data_limit", nil))
+	if get.Code != http.StatusOK || !strings.Contains(get.Body.String(), `"data_flow_check_daily_or_monthly":"daily"`) || !strings.Contains(get.Body.String(), `"data_limit_status_forward_enabled":"1"`) {
+		t.Fatalf("get data limit: %d %s", get.Code, get.Body.String())
+	}
+}
+
+func TestAuthenticatedATAndIMSCompatibility(t *testing.T) {
+	db, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	cfg := config.Defaults()
+	cfg.ATEnabled = true
+	runner := &fakeRunner{result: processrunner.Result{Output: "+CAVIMS: 1 OK", ExitCode: 0}}
+	router := New(Dependencies{Config: cfg, Store: db, Device: device.NewSimulator(), Runner: runner, Version: "test"})
+
+	status := httptest.NewRecorder()
+	router.ServeHTTP(status, httptest.NewRequest(http.MethodGet, "/api/volte_status?slot=0", nil))
+	if status.Code != http.StatusOK || !strings.Contains(status.Body.String(), `"enabled":true`) {
+		t.Fatalf("VoLTE status: %d %s", status.Code, status.Body.String())
+	}
+
+	at := httptest.NewRecorder()
+	router.ServeHTTP(at, httptest.NewRequest(http.MethodGet, "/api/AT?command=AT%2BCSQ&slot=1", nil))
+	if at.Code != http.StatusOK || !strings.Contains(runner.lastCommand, "-n 1") || !strings.Contains(runner.lastCommand, "AT+CSQ") {
+		t.Fatalf("AT: %d %s command=%q", at.Code, at.Body.String(), runner.lastCommand)
+	}
+}
+
+func TestLegacySpeedtestByteContract(t *testing.T) {
+	router := testRouter(t, "")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/speedtest?ckSize=1&cors=1", nil))
+	if recorder.Code != http.StatusOK || recorder.Body.Len() != 1<<20 || recorder.Header().Get("Access-Control-Allow-Origin") != "*" {
+		t.Fatalf("speedtest response: code=%d size=%d", recorder.Code, recorder.Body.Len())
+	}
+}
+
 func TestConfigPersistenceAndShellDefault(t *testing.T) {
 	router := testRouter(t, "")
 

@@ -46,6 +46,9 @@ type Config struct {
 	UpdateManifestURL  string
 	UpdatePublicKey    string
 	SpeedtestBinary    string
+	ATBinary           string
+	ATEnabled          bool
+	PrivilegedCompat   bool
 	HostsPath          string
 	SMSPollInterval    time.Duration
 }
@@ -93,6 +96,9 @@ func Load() (Config, error) {
 	flags.StringVar(&cfg.UpdateManifestURL, "update-manifest-url", envString("UFI_UPDATE_MANIFEST_URL", cfg.UpdateManifestURL), "optional signed update manifest URL")
 	flags.StringVar(&cfg.UpdatePublicKey, "update-public-key", envString("UFI_UPDATE_PUBLIC_KEY", cfg.UpdatePublicKey), "trusted Ed25519 public key file")
 	flags.StringVar(&cfg.SpeedtestBinary, "speedtest-binary", envString("UFI_SPEEDTEST_BINARY", cfg.SpeedtestBinary), "speedtest executable path")
+	flags.StringVar(&cfg.ATBinary, "at-binary", envString("UFI_AT_BINARY", cfg.ATBinary), "U60 AT helper executable path")
+	flags.BoolVar(&cfg.ATEnabled, "at-enabled", envBool("UFI_AT_ENABLED", cfg.ATEnabled), "enable authenticated AT command compatibility")
+	flags.BoolVar(&cfg.PrivilegedCompat, "privileged-compat", envBool("UFI_PRIVILEGED_COMPAT", cfg.PrivilegedCompat), "enable fixed privileged UFI compatibility operations")
 	flags.StringVar(&cfg.HostsPath, "hosts-path", envString("UFI_HOSTS_PATH", cfg.HostsPath), "optional hosts file to manage")
 	smsInterval, err := time.ParseDuration(envString("UFI_SMS_POLL_INTERVAL", cfg.SMSPollInterval.String()))
 	if err != nil {
@@ -131,6 +137,7 @@ func Defaults() Config {
 		TTYDBinary:        "/data/ufi-tools/ttyd",
 		TTYDPort:          1146,
 		SpeedtestBinary:   "/data/ufi-tools/speedtest",
+		ATBinary:          "/data/ufi-tools/sendat",
 		SMSPollInterval:   10 * time.Second,
 	}
 }
@@ -186,6 +193,9 @@ func (c Config) Validate() error {
 	}
 	if !filepath.IsAbs(c.SpeedtestBinary) {
 		return errors.New("speedtest binary path must be absolute")
+	}
+	if !filepath.IsAbs(c.ATBinary) {
+		return errors.New("AT helper path must be absolute")
 	}
 	if c.HostsPath != "" && !filepath.IsAbs(c.HostsPath) {
 		return errors.New("hosts path must be absolute")
