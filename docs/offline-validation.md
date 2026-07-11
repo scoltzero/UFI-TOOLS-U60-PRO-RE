@@ -15,6 +15,7 @@ make installer-test
 node --check internal/webui/static/app.js
 file bin/ufi-tools-u60pro-linux-arm64 bin/verify-release-linux-arm64 bin/UFI-TOOLS-U60-Pro-Installer.exe
 sh -n installer/install-adb.sh installer/bundle/service.sh
+sh installer/test-install-adb.sh
 ```
 
 Expected build properties:
