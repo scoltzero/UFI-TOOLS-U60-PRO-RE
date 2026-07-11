@@ -181,6 +181,12 @@ func (s *Store) SetScheduler(ctx context.Context, id, data string) error {
 	return err
 }
 
+func (s *Store) GetScheduler(ctx context.Context, id string) (Scheduler, error) {
+	var item Scheduler
+	err := s.db.QueryRowContext(ctx, "SELECT id, data FROM scheduler WHERE id = ?", id).Scan(&item.ID, &item.Data)
+	return item, err
+}
+
 func (s *Store) DeleteScheduler(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM scheduler WHERE id = ?", id)
 	return err
@@ -208,6 +214,11 @@ func (s *Store) GetUpload(ctx context.Context, name string) ([]byte, error) {
 	var data []byte
 	err := s.db.QueryRowContext(ctx, "SELECT data FROM uploads WHERE name = ?", name).Scan(&data)
 	return data, err
+}
+
+func (s *Store) DeleteUpload(ctx context.Context, name string) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM uploads WHERE name = ?", name)
+	return err
 }
 
 func (s *Store) ListUploads(ctx context.Context) ([]Upload, error) {

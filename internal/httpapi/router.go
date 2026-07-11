@@ -191,8 +191,28 @@ func (h *handler) timeStatus(w http.ResponseWriter, _ *http.Request) {
 	}})
 }
 
-func (h *handler) timeSync(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, envelope{Code: 501, Message: "host time mutation is unavailable in simulator mode"})
+func (h *handler) timeSync(w http.ResponseWriter, r *http.Request) {
+	if h.deps.Config.DeviceBackend == "simulator" {
+		writeJSON(w, http.StatusConflict, envelope{Code: 409, Message: "time mutation is disabled in simulator mode"})
+		return
+	}
+	if h.deps.Runner == nil {
+		writeJSON(w, http.StatusServiceUnavailable, envelope{Code: 503, Message: "system runner unavailable"})
+		return
+	}
+	var request struct {
+		Unix int64 `json:"unix"`
+	}
+	if err := decodeJSON(r, &request); err != nil || request.Unix < 946684800 || request.Unix > 4102444800 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "valid unix timestamp is required"})
+		return
+	}
+	result, err := h.deps.Runner.Run(r.Context(), "date -s @"+strconv.FormatInt(request.Unix, 10))
+	if err != nil || result.ExitCode != 0 {
+		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "time synchronization failed", Data: result})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]int64{"unix": request.Unix}})
 }
 
 func (h *handler) runShell(w http.ResponseWriter, r *http.Request) {

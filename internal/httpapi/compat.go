@@ -68,6 +68,16 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/plugin/notifications", h.emptyPluginEvents)
 	mux.HandleFunc("POST /api/plugin/notification/read", h.emptyPluginEvents)
 	mux.HandleFunc("GET /api/plugin/changelog", h.emptyPluginEvents)
+	mux.HandleFunc("GET /api/SELinux", h.systemStatus("getenforce", "mode"))
+	mux.HandleFunc("GET /api/usb_status", h.systemStatus("getprop sys.usb.state", "state"))
+	mux.HandleFunc("POST /api/set_wakelock_status", h.setWakelock)
+	mux.HandleFunc("GET /api/wifi/qrcode", h.wifiQRCodeData)
+	mux.HandleFunc("POST /api/speedtest", h.speedtest)
+	mux.HandleFunc("POST /api/upload_img", h.uploadFile)
+	mux.HandleFunc("DELETE /api/delete_img", h.deleteImage)
+	mux.HandleFunc("GET /api/get_task", h.getTask)
+	mux.HandleFunc("POST /api/remove_task", h.removeTaskBody)
+	mux.HandleFunc("GET /api/proxy/{path...}", h.deviceProxy)
 	mux.HandleFunc("POST /api/hosts_restore", h.restoreHosts)
 	mux.HandleFunc("GET /api/goform/goform_get_cmd_process", h.goFormGet)
 	mux.HandleFunc("POST /api/goform/goform_set_cmd_process", h.goFormSet)
@@ -95,17 +105,6 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	} {
 		mux.HandleFunc("GET "+route.path, h.getKV(route.key, route.fallback))
 		mux.HandleFunc("POST "+route.path, h.setKV(route.key))
-	}
-
-	for _, pattern := range []string{
-		"GET /api/SELinux", "GET /api/usb_status",
-		"POST /api/set_wakelock_status",
-		"GET /api/wifi/qrcode", "POST /api/speedtest",
-		"POST /api/upload_img", "DELETE /api/delete_img",
-		"GET /api/get_task", "POST /api/remove_task",
-		"GET /api/proxy/{path...}",
-	} {
-		mux.HandleFunc(pattern, h.notAvailable)
 	}
 
 }
@@ -406,10 +405,6 @@ func toString(value any) string {
 		encoded, _ := json.Marshal(value)
 		return string(encoded)
 	}
-}
-
-func (h *handler) notAvailable(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusNotImplemented, envelope{Code: 501, Message: "recognized compatibility route; privileged device adapter is not configured"})
 }
 
 func (h *handler) ttydStatus(w http.ResponseWriter, _ *http.Request) {

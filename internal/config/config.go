@@ -45,6 +45,7 @@ type Config struct {
 	TTYDPort           int
 	UpdateManifestURL  string
 	UpdatePublicKey    string
+	SpeedtestBinary    string
 }
 
 func Load() (Config, error) {
@@ -89,6 +90,7 @@ func Load() (Config, error) {
 	flags.IntVar(&cfg.TTYDPort, "ttyd-port", envInt("UFI_TTYD_PORT", cfg.TTYDPort), "ttyd listen port")
 	flags.StringVar(&cfg.UpdateManifestURL, "update-manifest-url", envString("UFI_UPDATE_MANIFEST_URL", cfg.UpdateManifestURL), "optional signed update manifest URL")
 	flags.StringVar(&cfg.UpdatePublicKey, "update-public-key", envString("UFI_UPDATE_PUBLIC_KEY", cfg.UpdatePublicKey), "trusted Ed25519 public key file")
+	flags.StringVar(&cfg.SpeedtestBinary, "speedtest-binary", envString("UFI_SPEEDTEST_BINARY", cfg.SpeedtestBinary), "speedtest executable path")
 	skew, err := time.ParseDuration(envString("UFI_SIGN_CLOCK_SKEW", cfg.SignClockSkew.String()))
 	if err != nil {
 		return Config{}, fmt.Errorf("UFI_SIGN_CLOCK_SKEW: %w", err)
@@ -120,6 +122,7 @@ func Defaults() Config {
 		ShellMaxOutput:    1 << 20,
 		TTYDBinary:        "/data/ufi-tools/ttyd",
 		TTYDPort:          1146,
+		SpeedtestBinary:   "/data/ufi-tools/speedtest",
 	}
 }
 
@@ -171,6 +174,9 @@ func (c Config) Validate() error {
 	}
 	if !filepath.IsAbs(c.TTYDBinary) || c.TTYDPort < 1 || c.TTYDPort > 65535 {
 		return errors.New("ttyd requires an absolute binary path and valid port")
+	}
+	if !filepath.IsAbs(c.SpeedtestBinary) {
+		return errors.New("speedtest binary path must be absolute")
 	}
 	if (c.UpdateManifestURL == "") != (c.UpdatePublicKey == "") {
 		return errors.New("update manifest URL and public key must be configured together")
