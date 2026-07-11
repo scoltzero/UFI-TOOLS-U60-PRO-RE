@@ -14,6 +14,7 @@ import (
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/catalog"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/hostsfile"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/httpapi"
 	processrunner "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/process"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
@@ -91,11 +92,15 @@ func New(cfg config.Config, options ...Option) (*App, error) {
 		PIDFile: filepath.Join(cfg.DataDir, "ttyd.pid"),
 		LogFile: filepath.Join(cfg.DataDir, "ttyd.log"),
 	}
+	var hostsManager *hostsfile.Manager
+	if cfg.HostsPath != "" {
+		hostsManager = &hostsfile.Manager{Target: cfg.HostsPath, Backup: filepath.Join(cfg.DataDir, "hosts.original")}
+	}
 
 	app.server = &http.Server{
 		Addr: cfg.HTTPAddr,
 		Handler: httpapi.New(httpapi.Dependencies{
-			Config: cfg, Store: db, Device: deviceBackend, Logger: app.logger, Version: app.version, Catalog: catalogClient, Runner: runner, TTYD: ttyd, Updater: updater,
+			Config: cfg, Store: db, Device: deviceBackend, Logger: app.logger, Version: app.version, Catalog: catalogClient, Runner: runner, TTYD: ttyd, Updater: updater, Hosts: hostsManager,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,

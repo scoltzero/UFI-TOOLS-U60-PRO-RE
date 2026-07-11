@@ -18,6 +18,7 @@ import (
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/catalog"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/hostsfile"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/plugins"
 	processrunner "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/process"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
@@ -35,6 +36,7 @@ type Dependencies struct {
 	Runner  processrunner.Runner
 	TTYD    *processrunner.Supervisor
 	Updater *updateverify.Manager
+	Hosts   *hostsfile.Manager
 }
 
 type handler struct {
@@ -338,13 +340,25 @@ func (h *handler) setHosts(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save hosts"})
 		return
 	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Message: "stored; device apply adapter is not configured"})
+	if h.deps.Hosts != nil {
+		if err := h.deps.Hosts.Apply(request.Content); err != nil {
+			writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "hosts stored but apply failed"})
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]bool{"applied": h.deps.Hosts != nil}})
 }
 
 func (h *handler) restoreHosts(w http.ResponseWriter, r *http.Request) {
 	if err := h.deps.Store.Set(r.Context(), "kv", "hosts", ""); err != nil {
 		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "restore hosts"})
 		return
+	}
+	if h.deps.Hosts != nil {
+		if err := h.deps.Hosts.Restore(); err != nil {
+			writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "restore hosts file"})
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, envelope{Code: 0})
 }

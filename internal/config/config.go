@@ -46,6 +46,7 @@ type Config struct {
 	UpdateManifestURL  string
 	UpdatePublicKey    string
 	SpeedtestBinary    string
+	HostsPath          string
 }
 
 func Load() (Config, error) {
@@ -91,6 +92,7 @@ func Load() (Config, error) {
 	flags.StringVar(&cfg.UpdateManifestURL, "update-manifest-url", envString("UFI_UPDATE_MANIFEST_URL", cfg.UpdateManifestURL), "optional signed update manifest URL")
 	flags.StringVar(&cfg.UpdatePublicKey, "update-public-key", envString("UFI_UPDATE_PUBLIC_KEY", cfg.UpdatePublicKey), "trusted Ed25519 public key file")
 	flags.StringVar(&cfg.SpeedtestBinary, "speedtest-binary", envString("UFI_SPEEDTEST_BINARY", cfg.SpeedtestBinary), "speedtest executable path")
+	flags.StringVar(&cfg.HostsPath, "hosts-path", envString("UFI_HOSTS_PATH", cfg.HostsPath), "optional hosts file to manage")
 	skew, err := time.ParseDuration(envString("UFI_SIGN_CLOCK_SKEW", cfg.SignClockSkew.String()))
 	if err != nil {
 		return Config{}, fmt.Errorf("UFI_SIGN_CLOCK_SKEW: %w", err)
@@ -177,6 +179,9 @@ func (c Config) Validate() error {
 	}
 	if !filepath.IsAbs(c.SpeedtestBinary) {
 		return errors.New("speedtest binary path must be absolute")
+	}
+	if c.HostsPath != "" && !filepath.IsAbs(c.HostsPath) {
+		return errors.New("hosts path must be absolute")
 	}
 	if (c.UpdateManifestURL == "") != (c.UpdatePublicKey == "") {
 		return errors.New("update manifest URL and public key must be configured together")

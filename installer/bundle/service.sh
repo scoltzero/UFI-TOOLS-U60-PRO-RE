@@ -11,7 +11,7 @@ HEALTH_ATTEMPTS=${UFI_HEALTH_ATTEMPTS:-20}
 start() {
   [ -x "$ROOT/ufi-tools-u60pro" ] || exit 1
   if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then return 0; fi
-  UFI_DATA_DIR="$ROOT/data" UFI_HTTP_ADDR=:2333 "$ROOT/ufi-tools-u60pro" >>"$ROOT/service.log" 2>&1 &
+  UFI_DATA_DIR="$ROOT/data" UFI_HTTP_ADDR=:2333 UFI_HOSTS_PATH=/etc/hosts "$ROOT/ufi-tools-u60pro" >>"$ROOT/service.log" 2>&1 &
   echo $! > "$PIDFILE"
 }
 
