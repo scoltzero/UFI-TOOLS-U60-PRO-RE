@@ -95,7 +95,9 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/delete_img", h.deleteImage)
 	mux.HandleFunc("GET /api/get_task", h.getTask)
 	mux.HandleFunc("POST /api/remove_task", h.removeTaskBody)
-	mux.HandleFunc("GET /api/proxy/{path...}", h.deviceProxy)
+	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		mux.HandleFunc(method+" /api/proxy/{path...}", h.compatProxy)
+	}
 	mux.HandleFunc("POST /api/hosts_restore", h.restoreHosts)
 	mux.HandleFunc("GET /api/goform/goform_get_cmd_process", h.legacyGoFormGet)
 	mux.HandleFunc("POST /api/goform/goform_set_cmd_process", h.legacyGoFormSet)

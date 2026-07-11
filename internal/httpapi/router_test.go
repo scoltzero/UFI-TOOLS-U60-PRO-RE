@@ -189,6 +189,43 @@ func TestLegacySMSSettingShapes(t *testing.T) {
 	}
 }
 
+func TestCompatibilityProxySeparatesDeviceAndPublicTargets(t *testing.T) {
+	deviceServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/goform/test" || r.URL.Query().Get("x") != "1" {
+			t.Fatalf("unexpected proxied request: %s %s", r.Method, r.URL.String())
+		}
+		if r.Header.Get("Cookie") != "sid=test" {
+			t.Fatalf("missing translated cookie: %#v", r.Header)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"result":"success"}`))
+	}))
+	defer deviceServer.Close()
+	db, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	cfg := config.Defaults()
+	cfg.DeviceBackend = "zte-http"
+	cfg.DeviceBaseURL = deviceServer.URL
+	router := New(Dependencies{Config: cfg, Store: db, Device: device.NewSimulator()})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/proxy/goform/test?x=1", strings.NewReader(`{"a":1}`))
+	req.Header.Set("kano-cookie", "sid=test")
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "success") {
+		t.Fatalf("device proxy: %d %s", recorder.Code, recorder.Body.String())
+	}
+
+	blocked := httptest.NewRecorder()
+	router.ServeHTTP(blocked, httptest.NewRequest(http.MethodGet, "/api/proxy/--http://127.0.0.1/private", nil))
+	if blocked.Code != http.StatusForbidden {
+		t.Fatalf("private external proxy target should be blocked: %d %s", blocked.Code, blocked.Body.String())
+	}
+}
+
 func TestConfigPersistenceAndShellDefault(t *testing.T) {
 	router := testRouter(t, "")
 

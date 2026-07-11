@@ -96,7 +96,23 @@ func New(deps Dependencies) http.Handler {
 		root.Handle(method+" /api/", protectedHandler)
 	}
 	root.Handle("GET /", http.FileServer(http.FS(assets)))
-	return limitBody(securityHeaders(root))
+	proxyHandler := h.auth.middleware(http.HandlerFunc(h.compatProxy))
+	dispatch := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// net/http ServeMux canonicalizes the double slash inside an encoded
+		// absolute proxy URL. Intercept this compatibility form before ServeMux
+		// so `/api/proxy/--https://host/path` remains byte-for-byte usable.
+		if strings.HasPrefix(r.URL.Path, "/api/proxy/--") {
+			switch r.Method {
+			case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+				proxyHandler.ServeHTTP(w, r)
+			default:
+				w.WriteHeader(http.StatusMethodNotAllowed)
+			}
+			return
+		}
+		root.ServeHTTP(w, r)
+	})
+	return limitBody(securityHeaders(dispatch))
 }
 
 func (h *handler) health(w http.ResponseWriter, r *http.Request) {
