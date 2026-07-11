@@ -20,7 +20,8 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/accept_terms", h.setFlag("terms_accepted"))
 	mux.HandleFunc("GET /api/get_theme", h.getKV("theme", "auto"))
 	mux.HandleFunc("POST /api/set_theme", h.setKV("theme"))
-	mux.HandleFunc("POST /api/set_nickname", h.setKV("nickname"))
+	mux.HandleFunc("POST /api/set_nickname", h.setNickname)
+	mux.HandleFunc("POST /api/set_token", h.setToken)
 	mux.HandleFunc("GET /api/get_res_server", h.getKV("resource_server_url", h.deps.Config.ResourceServerURL))
 	mux.HandleFunc("POST /api/set_res_server", h.setKV("resource_server_url"))
 	mux.HandleFunc("GET /api/get_log_status", h.getKV("log_enabled", "true"))
@@ -69,7 +70,7 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 		"POST /api/plugin/notification/read", "GET /api/plugin/update/check",
 		"POST /api/plugin/update/download", "POST /api/plugin/download", "POST /api/plugin/install",
 		"POST /api/plugin/uninstall",
-		"POST /api/set_token", "GET /api/get_task", "POST /api/remove_task",
+		"GET /api/get_task", "POST /api/remove_task",
 		"GET /api/proxy/{path...}",
 	} {
 		mux.HandleFunc(pattern, h.notAvailable)
@@ -104,6 +105,36 @@ func (h *handler) stableID(key string) http.HandlerFunc {
 func (h *handler) weakToken(w http.ResponseWriter, _ *http.Request) {
 	weak := len(h.deps.Config.DeviceToken) < 16
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]bool{"weak": weak}})
+}
+
+func (h *handler) setToken(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Token string `json:"token"`
+	}
+	if err := decodeJSON(r, &request); err != nil || len(request.Token) < 16 || len(request.Token) > 256 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "token must be between 16 and 256 characters"})
+		return
+	}
+	if err := h.deps.Store.Set(r.Context(), "config", "device_token", request.Token); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save token"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Message: "token saved; restart the service to activate it"})
+}
+
+func (h *handler) setNickname(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Nickname string `json:"nickname"`
+	}
+	if err := decodeJSON(r, &request); err != nil || strings.TrimSpace(request.Nickname) == "" || len(request.Nickname) > 128 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "nickname is required"})
+		return
+	}
+	if err := h.deps.Store.Set(r.Context(), "config", "nickname", strings.TrimSpace(request.Nickname)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save nickname"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0})
 }
 
 func (h *handler) getKV(key, fallback string) http.HandlerFunc {

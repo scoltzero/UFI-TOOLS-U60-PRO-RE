@@ -131,3 +131,20 @@ func TestObservedCompatibilityPathsAreRegistered(t *testing.T) {
 		}
 	}
 }
+
+func TestLegacyIdentitySettingsPersist(t *testing.T) {
+	router := testRouter(t, "")
+	for _, request := range []struct {
+		path string
+		body string
+	}{
+		{"/api/set_nickname", `{"nickname":"portable-lab"}`},
+		{"/api/set_token", `{"token":"0123456789abcdef0123456789abcdef"}`},
+	} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, request.path, strings.NewReader(request.body)))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", request.path, recorder.Code, recorder.Body.String())
+		}
+	}
+}
