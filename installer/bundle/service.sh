@@ -43,7 +43,16 @@ install_bundle() {
   cp "$STAGE/public-key.hex" "$NEXT/public-key.hex"
   cp "$STAGE/service.sh" "$NEXT/service.sh"
   cp "$STAGE/manifest.json" "$NEXT/manifest.json"
+  for optional in ttyd speedtest; do
+    if [ -f "$STAGE/$optional" ]; then
+      cp "$STAGE/$optional" "$NEXT/$optional"
+    elif [ -f "$ROOT/$optional" ]; then
+      cp "$ROOT/$optional" "$NEXT/$optional"
+    fi
+  done
   chmod 0755 "$NEXT/ufi-tools-u60pro" "$NEXT/verify-release" "$NEXT/service.sh"
+  [ ! -f "$NEXT/ttyd" ] || chmod 0755 "$NEXT/ttyd"
+  [ ! -f "$NEXT/speedtest" ] || chmod 0755 "$NEXT/speedtest"
   stop
   rm -rf "$BACKUP"
   [ ! -d "$ROOT" ] || mv "$ROOT" "$BACKUP"

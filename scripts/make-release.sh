@@ -16,6 +16,8 @@ cp installer/bundle/service.sh "$OUT/service.sh"
 cp "$PUBLIC_KEY" "$OUT/public-key.hex"
 cp LICENSE NOTICE "$OUT/"
 ./scripts/collect-licenses.sh "$OUT/third-party-licenses"
+if [ -n "${TTYD_BINARY:-}" ]; then cp "$TTYD_BINARY" "$OUT/ttyd"; chmod 0755 "$OUT/ttyd"; fi
+if [ -n "${SPEEDTEST_BINARY:-}" ]; then cp "$SPEEDTEST_BINARY" "$OUT/speedtest"; chmod 0755 "$OUT/speedtest"; fi
 chmod 0755 "$OUT/ufi-tools-u60pro" "$OUT/verify-release" "$OUT/service.sh"
 
 go run ./cmd/sign-release \

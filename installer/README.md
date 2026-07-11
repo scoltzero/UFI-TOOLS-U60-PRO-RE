@@ -27,3 +27,16 @@ VERSION=0.1.0 PRIVATE_KEY=/secure/private.hex PUBLIC_KEY=release-public-key.hex 
 
 `installer/test-transaction.sh` exercises the atomic swap and failure rollback
 entirely under a temporary directory with fake health and verifier commands.
+
+Optional open-source `ttyd` and speed-test binaries can be included without
+vendoring them in this repository:
+
+```sh
+TTYD_BINARY=/path/to/linux-arm64/ttyd \
+SPEEDTEST_BINARY=/path/to/linux-arm64/speedtest \
+VERSION=0.1.0 PRIVATE_KEY=/secure/private.hex PUBLIC_KEY=release-public-key.hex \
+  ./scripts/make-release.sh
+```
+
+They are preserved across later core-only updates. Their licenses must be
+added to the release's third-party notices by the distributor.
