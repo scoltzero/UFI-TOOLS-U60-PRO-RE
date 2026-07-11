@@ -7,13 +7,16 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/plugins"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/webui"
 )
 
 type Dependencies struct {
@@ -51,11 +54,19 @@ func New(deps Dependencies) http.Handler {
 	protected.HandleFunc("GET /api/time/status", h.timeStatus)
 	protected.HandleFunc("POST /api/time/sync", h.timeSync)
 	protected.HandleFunc("POST /api/run_shell", h.runShell)
+	protected.HandleFunc("GET /api/plugins/custom_head", h.getCustomHead)
+	protected.HandleFunc("POST /api/plugins/custom_head", h.setCustomHead)
+	protected.HandleFunc("GET /api/store/plugins", h.localCatalog)
 
 	root := http.NewServeMux()
 	root.Handle("GET /healthz", public)
 	root.Handle("GET /api/version", public)
 	root.Handle("GET /api/need_token", public)
+	assets, _ := fs.Sub(webui.Files, "static")
+	root.Handle("GET /assets/", http.StripPrefix("/assets/", http.FileServer(http.FS(assets))))
+	root.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, webui.Files, "static/index.html")
+	})
 	root.Handle("/", h.auth.middleware(protected))
 	return limitBody(securityHeaders(root))
 }
@@ -165,6 +176,50 @@ func (h *handler) runShell(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusNotImplemented, envelope{Code: 501, Message: "no command runner is configured"})
+}
+
+func (h *handler) getCustomHead(w http.ResponseWriter, r *http.Request) {
+	source, err := h.deps.Store.Get(r.Context(), "kv", "custom_head")
+	if errors.Is(err, sql.ErrNoRows) {
+		writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{"source": "", "plugins": []any{}}})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "read plugins"})
+		return
+	}
+	doc, err := plugins.Parse(source)
+	if err != nil {
+		writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{"source": source, "valid": false}})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: doc})
+}
+
+func (h *handler) setCustomHead(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Source string `json:"source"`
+	}
+	if err := decodeJSON(r, &request); err != nil {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid plugin document"})
+		return
+	}
+	doc, err := plugins.Parse(request.Source)
+	if err != nil {
+		writeJSON(w, http.StatusUnprocessableEntity, envelope{Code: 422, Message: err.Error()})
+		return
+	}
+	if err := h.deps.Store.Set(r.Context(), "kv", "custom_head", request.Source); err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save plugins"})
+		return
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: doc})
+}
+
+func (h *handler) localCatalog(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{
+		"source": "local", "plugins": []any{}, "remote_configured": h.deps.Config.PluginServerURL != "",
+	}})
 }
 
 func decodeJSON(r *http.Request, target any) error {
