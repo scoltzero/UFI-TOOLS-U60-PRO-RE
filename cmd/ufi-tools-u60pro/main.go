@@ -16,7 +16,7 @@ import (
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
 )
 
-var version = "dev"
+var version = "0.0.1"
 
 func main() {
 	cfg, err := config.Load()

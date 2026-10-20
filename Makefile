@@ -1,3 +1,6 @@
+VERSION ?= 0.0.1
+LDFLAGS_VERSION = -X main.version=$(VERSION)
+
 .PHONY: test lint vuln build build-arm64 build-installers android-check installer-test license-test
 
 test:
@@ -10,10 +13,10 @@ vuln:
 	go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 $$(go list -e ./... | rg -v '/third_party/')
 
 build:
-	go build -buildvcs=false -trimpath -o bin/ufi-tools-u60pro ./cmd/ufi-tools-u60pro
+	go build -buildvcs=false -trimpath -ldflags "$(LDFLAGS_VERSION)" -o bin/ufi-tools-u60pro ./cmd/ufi-tools-u60pro
 
 build-arm64:
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags "-s -w" -o bin/ufi-tools-u60pro-linux-arm64 ./cmd/ufi-tools-u60pro
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags "-s -w $(LDFLAGS_VERSION)" -o bin/ufi-tools-u60pro-linux-arm64 ./cmd/ufi-tools-u60pro
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags "-s -w" -o bin/verify-release-linux-arm64 ./cmd/verify-release
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags "-s -w" -o bin/ufi-plugin-store-linux-arm64 ./cmd/ufi-plugin-store
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -buildvcs=false -trimpath -ldflags "-s -w" -o bin/sendat-linux-arm64 ./cmd/sendat

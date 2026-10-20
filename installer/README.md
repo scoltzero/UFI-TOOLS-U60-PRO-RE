@@ -45,7 +45,7 @@ transactional LAN client. Build the PE32+ GUI executable with:
 make build-installers
 ```
 
-The clean-room native Android project is under `installer/android`. It supports
+The native Android project is under `installer/android`. It supports
 document selection, preview mode, explicit restore confirmation, app-private
 rollback-container storage, restart-aware health checks, and verified rollback. Build it
 with JDK 17 and Android SDK 35 using `./gradlew :app:assembleDebug` from that

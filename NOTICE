@@ -1,4 +1,4 @@
-UFI-TOOLS-U60-PRO-RE is an independent interoperability implementation for the
+UFI-TOOLS-U60-PRO-RE is a behavior-level replica of UFI-TOOLS-U60Pro for the
 ZTE U60 Pro device family.
 
 The project may incorporate or adapt portions of the MIT-licensed UFI-TOOLS
@@ -6,8 +6,9 @@ project by kanoqwq. Such files must retain their original copyright and MIT
 license notices. New project code is AGPL-3.0-or-later unless a file says
 otherwise.
 
-No closed-source executable, decompiler output, signing secret, private server
-credential, Qualcomm proprietary utility, firmware image, or device backup is
-part of this repository. Names and protocol descriptions are used only to
-identify compatible interfaces.
+The implementation replicates the behavior of the closed UFI-TOOLS-U60Pro
+service with its author's permission for non-commercial study. No closed-source
+executable, decompiler output, signing secret, private server credential,
+Qualcomm proprietary utility, firmware image, or device backup is part of this
+repository.
 

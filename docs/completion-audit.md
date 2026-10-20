@@ -8,7 +8,7 @@ injection.
 | Requirement | Evidence | Result |
 |---|---|---|
 | Repository and version history | Local `UFI-TOOLS-U60-PRO-RE`, private GitHub origin, stepwise commits preserved by PR #1 merge into default branch `main` | Complete |
-| Open-source provenance | `UPSTREAM.lock`, upstream integration notes, exact MIT notice, clean-room policy | Complete |
+| Open-source provenance | `UPSTREAM.lock`, upstream integration notes, exact MIT notice, replica policy | Complete |
 | Reference-service analysis | Sanitized service/route map records plugin, update, reporting, notification, blacklist, CAPTCHA, author and legacy-UI endpoints without retaining credentials or private responses | Complete |
 | Static U60 runtime | Go service, SQLite migrations, embedded UI, Linux/ARM64 static build | Complete offline |
 | U60 device adapter | Dedicated UBUS backend calibrated on the authorized U60 Pro; generic GoForm adapter retained | Read-only core validated on device |

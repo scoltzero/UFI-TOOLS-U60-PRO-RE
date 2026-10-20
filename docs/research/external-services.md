@@ -33,11 +33,9 @@ from a claim that every address is used by the current closed core:
 | `https://github.com/kanoqwq/UFI-TOOLS` | Upstream source/author attribution | Retained as attribution and documentation |
 | `plugin@kano.ink` | Plugin/contact identifier in the legacy UI | Recorded as provenance; it is not contacted automatically |
 
-The embedded runtime terms now override the legacy MIT/privacy text with the
-current AGPL project policy: no author telemetry by default, and outbound data
-only when an administrator explicitly configures and uses an external store,
-update source, SMS webhook, or proxy-backed feature. The upstream MIT notice is
-preserved separately in `NOTICE`.
+The embedded UI shows the upstream terms text again. The 0.3.2 reference
+frontend does not call `api.kanokano.cn/ufi_tools_report`; its telemetry lives
+in the core service (`/api/v1/devices/*`).
 
 ## Public plugin supply-chain inventory
 
@@ -51,10 +49,10 @@ plugin sources remain ignored and are not redistributed without license review.
 
 ## Behavior and risk assessment
 
-The reference core periodically registered/reported the device and polled
-notifications/updates. A delayed then recurring blacklist check could cause the
-service to edit its startup entry and stop itself. These behaviors are not
-required for U60 Pro interoperability and are intentionally absent here.
+The reference core periodically registers/reports the device and polls
+notifications/updates. A delayed then recurring blacklist check can make the
+service edit its startup entry and stop itself. Per the replica policy these
+behaviors are to be reproduced; they are not implemented yet.
 
 Reference OTA behavior checked size and ELF identity but did not establish an
 independent offline trust root. This project instead requires an Ed25519-signed

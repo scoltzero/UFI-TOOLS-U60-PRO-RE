@@ -16,7 +16,8 @@ web/API compromise can become a device compromise.
 - Arbitrary command execution through compatibility shell endpoints.
 - Malicious plugins gaining persistent script execution in the management UI.
 - Supply-chain replacement of the daemon, UI, installer, or plugin catalog.
-- Third-party telemetry, blacklist, or kill-switch endpoints.
+- Reference control-plane endpoints (registration, reporting, blacklist) being
+  unreachable, spoofed, or returning a stop decision.
 - Partial installation leaving the device unable to start or roll back.
 
 ## Required controls
@@ -29,5 +30,7 @@ web/API compromise can become a device compromise.
 - Offline public-key verification for release manifests and artifacts.
 - Transactional install with preflight checks, backups, health checks, and
   rollback.
-- No mandatory external service and no hidden outbound requests.
+- Outbound reference services are documented in
+  `docs/research/external-services.md`; failures of those services must not
+  break local device management.
 

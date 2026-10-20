@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased
+## Unreleased (0.0.1)
 
-- Established AGPL clean-room repository and MIT attribution boundary.
+- Retargeted the project as a behavior-level replica of the closed 0.3.2
+  reference; versioning restarts at 0.0.1. Decompiled evidence may guide the
+  implementation and stays out of Git.
+- Established AGPL repository and MIT attribution boundary.
 - Added static Go/ARM64 service, configuration validation, SQLite migrations,
   health/version endpoints, and graceful shutdown.
 - Added primary and opt-in legacy authentication compatibility.

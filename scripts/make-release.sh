@@ -1,13 +1,13 @@
 #!/bin/sh
 set -eu
 
-VERSION=${VERSION:?set VERSION, for example 0.1.0}
+VERSION=${VERSION:?set VERSION, for example 0.0.1}
 PRIVATE_KEY=${PRIVATE_KEY:?set PRIVATE_KEY to an Ed25519 private key file}
 PUBLIC_KEY=${PUBLIC_KEY:?set PUBLIC_KEY to the matching public key file}
 OUT=${OUT:-build/release-$VERSION}
 ARCHIVE=$PWD/build/UFI-TOOLS-U60-PRO-RE-$VERSION-linux-arm64.tar.gz
 
-make build-arm64
+make build-arm64 VERSION="$VERSION"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 cp bin/ufi-tools-u60pro-linux-arm64 "$OUT/ufi-tools-u60pro"

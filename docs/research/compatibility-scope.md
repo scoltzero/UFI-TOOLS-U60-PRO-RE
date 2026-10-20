@@ -1,7 +1,7 @@
 # Compatibility scope
 
 This document is the sanitized handoff from behavior research to implementation.
-It intentionally contains no decompiler output.
+Decompiler output stays in the ignored `research-inputs/` directory.
 
 ## Runtime contract
 
@@ -32,10 +32,15 @@ implementations.
 - `KANO_PLUGIN_START`, metadata, and `KANO_PLUGIN_END` markers.
 - The historical `kano_disabled` wrapper.
 
-## Intentional differences
+## Pending parity work
 
-- The default store is self-hosted/configurable.
-- Update artifacts require a trusted signature.
-- Telemetry and external blacklist checks are absent.
+These differences from the 0.3.2 reference remain and are scheduled to be
+closed (see `docs/replica-policy.md`):
+
+- The default store is self-hosted/configurable instead of the official store.
+- Update artifacts require an Ed25519 signature; the reference checks size and
+  ELF identity only.
+- Device registration/reporting, notifications and the blacklist check are not
+  implemented yet.
 - Legacy authentication and shell behavior are opt-in compatibility modes.
 

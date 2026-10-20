@@ -1,6 +1,6 @@
 # Reference build inventory
 
-This is a clean-room evidence index. Hashes identify researcher-owned inputs;
+This is a reference evidence index. Hashes identify researcher-owned inputs;
 the binaries themselves are excluded from Git.
 
 ## Current U60 Pro core

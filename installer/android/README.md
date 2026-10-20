@@ -1,6 +1,6 @@
 # Android graphical installer
 
-This is a clean-room native Android implementation of the documented U60 Pro
+This is an independently written native Android implementation of the documented U60 Pro
 LAN backup/restore protocol. It does not contain files, resources, or code from
 the supplied closed APK.
 
