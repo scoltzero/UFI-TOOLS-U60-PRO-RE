@@ -3,11 +3,14 @@
 package process
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -120,6 +123,32 @@ func (s *Supervisor) statusLocked() ProcessStatus {
 	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
 	if err != nil || pid <= 0 {
 		return status
+	}
+	if s.cmd == nil || s.cmd.Process.Pid != pid {
+		if runtime.GOOS != "linux" {
+			return status
+		}
+		exe, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
+		if err != nil {
+			return status
+		}
+		want, _ := filepath.EvalSymlinks(s.Binary)
+		if exe != want {
+			return status
+		}
+		args, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
+		if err != nil {
+			return status
+		}
+		actual := bytes.Split(bytes.TrimRight(args, "\x00"), []byte{0})
+		if len(actual) != len(s.Args)+1 {
+			return status
+		}
+		for i, arg := range s.Args {
+			if string(actual[i+1]) != arg {
+				return status
+			}
+		}
 	}
 	process, err := os.FindProcess(pid)
 	if err != nil {

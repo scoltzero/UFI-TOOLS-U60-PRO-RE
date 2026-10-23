@@ -17,8 +17,8 @@ import (
 )
 
 const (
-	defaultDataDir  = "/data/ufi-tools"
-	defaultHTTPAddr = ":2333"
+	defaultDataDir  = "/data/ufi-tools-re"
+	defaultHTTPAddr = ":2433"
 )
 
 type Config struct {
@@ -62,13 +62,13 @@ func Load() (Config, error) {
 	flags.StringVar(&cfg.HTTPAddr, "http-addr", envString("UFI_HTTP_ADDR", cfg.HTTPAddr), "HTTP listen address")
 	flags.StringVar(&cfg.LogLevelName, "log-level", envString("UFI_LOG_LEVEL", cfg.LogLevelName), "debug, info, warn, or error")
 	flags.StringVar(&cfg.Nickname, "nickname", envString("UFI_NICKNAME", cfg.Nickname), "device display name")
-	flags.StringVar(&cfg.DeviceToken, "device-token", envString("UFI_DEVICE_TOKEN", cfg.DeviceToken), "API bearer token")
+	flags.StringVar(&cfg.DeviceToken, "device-token", envString("UFI_DEVICE_TOKEN", cfg.DeviceToken), "initial API bearer token; persisted rotations take precedence")
 	flags.BoolVar(&cfg.LegacyAuthEnabled, "legacy-auth", envBool("UFI_LEGACY_AUTH", cfg.LegacyAuthEnabled), "enable legacy authentication compatibility")
 	flags.BoolVar(&cfg.LegacyShellEnabled, "legacy-shell", envBool("UFI_LEGACY_SHELL", cfg.LegacyShellEnabled), "enable legacy shell endpoint")
 	flags.StringVar(&cfg.PluginServerURL, "plugin-server-url", envString("UFI_PLUGIN_SERVER_URL", cfg.PluginServerURL), "optional plugin catalog base URL")
 	flags.StringVar(&cfg.PluginServerToken, "plugin-server-token", envString("UFI_PLUGIN_SERVER_TOKEN", cfg.PluginServerToken), "optional plugin catalog token")
 	flags.StringVar(&cfg.ResourceServerURL, "resource-server-url", envString("UFI_RESOURCE_SERVER_URL", cfg.ResourceServerURL), "optional resource base URL")
-	flags.StringVar(&cfg.DeviceBackend, "device-backend", envString("UFI_DEVICE_BACKEND", cfg.DeviceBackend), "simulator, zte-http, or u60-ubus")
+	flags.StringVar(&cfg.DeviceBackend, "device-backend", envString("UFI_DEVICE_BACKEND", cfg.DeviceBackend), "simulator, zte-http, u60-ubus, or device-local u60-local")
 	flags.StringVar(&cfg.DeviceBaseURL, "device-base-url", envString("UFI_DEVICE_BASE_URL", cfg.DeviceBaseURL), "ZTE device HTTP origin")
 	flags.StringVar(&cfg.DeviceSession, "device-session", envString("UFI_DEVICE_SESSION", cfg.DeviceSession), "optional U60 UBUS session")
 	deviceTimeout, err := time.ParseDuration(envString("UFI_DEVICE_HTTP_TIMEOUT", cfg.DeviceHTTPTimeout.String()))
@@ -136,10 +136,10 @@ func Defaults() Config {
 		CellularInterval:  5 * time.Minute,
 		ShellTimeout:      30 * time.Second,
 		ShellMaxOutput:    1 << 20,
-		TTYDBinary:        "/data/ufi-tools/ttyd",
-		TTYDPort:          1146,
-		SpeedtestBinary:   "/data/ufi-tools/speedtest",
-		ATBinary:          "/data/ufi-tools/sendat",
+		TTYDBinary:        "/data/ufi-tools-re/ttyd",
+		TTYDPort:          1147,
+		SpeedtestBinary:   "/data/ufi-tools-re/speedtest",
+		ATBinary:          "/data/ufi-tools-re/sendat",
 		SMSPollInterval:   10 * time.Second,
 	}
 }
@@ -225,7 +225,7 @@ func (c Config) Validate() error {
 		}
 	}
 	switch c.DeviceBackend {
-	case "simulator":
+	case "simulator", "u60-local":
 		if c.DeviceBaseURL != "" {
 			return errors.New("device base URL requires the zte-http or u60-ubus backend")
 		}

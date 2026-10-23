@@ -2,7 +2,7 @@ module github.com/scoltzero/UFI-TOOLS-U60-PRO-RE
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.10
 
 require modernc.org/sqlite v1.51.0
 

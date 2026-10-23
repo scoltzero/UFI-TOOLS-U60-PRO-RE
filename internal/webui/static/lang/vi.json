@@ -264,6 +264,8 @@
     "wifi_option_off": "WIFI: Tắt",
     "wifi_option_24g": "WIFI: 2.4G",
     "wifi_option_5g": "WIFI: 5G",
+    "wifi_option_dual_current": "WIFI: 2.4G + 5G (hiện tại)",
+    "wifi_option_on_preserve": "WIFI: Bật (giữ băng tần)",
     "wifi_hint_no_submit": "Có hiệu lực ngay lập tức.",
     "wifi_ssid_label": "SSID：",
     "wifi_ssid_placeholder": "Nhập SSID",
@@ -739,8 +741,8 @@
     "device_usb_exp": "Chế Độ Device (kết nối máy tính)",
     "weak_token_detected": "Phát hiện mật khẩu yếu. Bạn phải thay đổi để đảm bảo an toàn thiết bị.",
     "change_token_now": "Thay đổi ngay",
-    "token_change_notice": "Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ và số.",
-    "toast_token_invalid": "Mật khẩu phải bao gồm chữ và số!",
+    "token_change_notice": "Dùng 8–256 chữ cái, chữ số hoặc ký hiệu, không có khoảng trắng.",
+    "toast_token_invalid": "Dùng 8–256 ký tự ASCII hiển thị, không có khoảng trắng.",
     "toast_token_too_short": "Mật khẩu phải có ít nhất 8 ký tự!",
     "three_days_later": "Nhắc lại sau 3 ngày",
     "three_days_later_info": "Để đảm bảo người dùng thay đổi mật khẩu, hệ thống sẽ tiếp tục nhắc lại sau 3 ngày.",
@@ -856,5 +858,9 @@
     "change_pass_tip2": "Mật khẩu hiện đang được UFI-TOOLS lưu là:",
     "plugin_override_mod": "Plugin đã tồn tại, cài đặt ghi đè",
     "export": "Xuất",
-    "reinstall": "Cài đặt lại"
+    "reinstall": "Cài đặt lại",
+    "candidate_login_title": "Sign in to UFI-TOOLS",
+    "candidate_login_note": "Use the token generated for this installation. The factory router password is not required.",
+    "candidate_token_label": "Application token",
+    "candidate_token_placeholder": "Enter the installation token"
 }

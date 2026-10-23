@@ -34,10 +34,11 @@ type Manager struct {
 	root        string
 	client      *http.Client
 
-	mu       sync.RWMutex
-	status   Status
-	manifest *Manifest
-	stage    string
+	operation sync.Mutex
+	mu        sync.RWMutex
+	status    Status
+	manifest  *Manifest
+	stage     string
 }
 
 func NewManager(manifestURL, publicKeyFile, root string, client *http.Client) (*Manager, error) {
@@ -79,6 +80,13 @@ func (m *Manager) Status() Status {
 }
 
 func (m *Manager) Check(ctx context.Context) (Manifest, error) {
+	if !m.operation.TryLock() {
+		return Manifest{}, errors.New("update operation already running")
+	}
+	defer m.operation.Unlock()
+	return m.check(ctx)
+}
+func (m *Manager) check(ctx context.Context) (Manifest, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, m.manifestURL.String(), nil)
 	if err != nil {
 		return Manifest{}, err
@@ -116,7 +124,11 @@ func (m *Manager) Check(ctx context.Context) (Manifest, error) {
 }
 
 func (m *Manager) Download(ctx context.Context) (Status, error) {
-	manifest, err := m.Check(ctx)
+	if !m.operation.TryLock() {
+		return m.Status(), errors.New("update operation already running")
+	}
+	defer m.operation.Unlock()
+	manifest, err := m.check(ctx)
 	if err != nil {
 		return m.Status(), err
 	}
@@ -187,6 +199,10 @@ func (m *Manager) Download(ctx context.Context) (Status, error) {
 }
 
 func (m *Manager) Install(ctx context.Context) error {
+	if !m.operation.TryLock() {
+		return errors.New("update operation already running")
+	}
+	defer m.operation.Unlock()
 	m.mu.RLock()
 	stage := m.stage
 	status := m.status

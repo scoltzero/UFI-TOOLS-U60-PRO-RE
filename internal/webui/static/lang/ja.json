@@ -264,6 +264,8 @@
     "wifi_option_off": "WIFI：OFF",
     "wifi_option_24g": "WIFI：2.4G",
     "wifi_option_5g": "WIFI：5G",
+    "wifi_option_dual_current": "WIFI：デュアルバンド（現在）",
+    "wifi_option_on_preserve": "WIFI：オン（帯域を維持）",
     "wifi_hint_no_submit": "即時反映、確認不要。",
     "wifi_ssid_label": "SSID：",
     "wifi_ssid_placeholder": "SSIDを入力",
@@ -739,8 +741,8 @@
     "device_usb_exp": "デバイスモード（PC 接続）",
     "weak_token_detected": "弱いパスワードが検出されました。デバイスの安全のため変更してください。",
     "change_token_now": "今すぐ変更",
-    "token_change_notice": "パスワードは8文字以上で、英字と数字を含める必要があります。",
-    "toast_token_invalid": "英字と数字を含めてください！",
+    "token_change_notice": "英数字・記号を8～256文字で入力してください（空白不可）。",
+    "toast_token_invalid": "英数字・記号を8～256文字で入力してください（空白不可）。",
     "toast_token_too_short": "パスワードは8文字以上必要です！",
     "three_days_later": "3日後に再通知",
     "three_days_later_info": "ユーザーが口令を変更するよう促すため、3日後に再度通知します。",
@@ -856,5 +858,9 @@
     "change_pass_tip2": "現在UFI-TOOLSに保存されているパスワード：",
     "plugin_override_mod": "プラグイン存在、上書きインストール済み",
     "export": "Export",
-    "reinstall": "再インストール"
+    "reinstall": "再インストール",
+    "candidate_login_title": "Sign in to UFI-TOOLS",
+    "candidate_login_note": "Use the token generated for this installation. The factory router password is not required.",
+    "candidate_token_label": "Application token",
+    "candidate_token_placeholder": "Enter the installation token"
 }

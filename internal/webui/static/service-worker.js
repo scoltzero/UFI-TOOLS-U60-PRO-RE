@@ -1,43 +1,12 @@
-const CACHE_NAME = 'ufi_tools_sw_cache';
-const URLS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/style/style.css',
-  '/main.js',
-  '/draglist.js',
-  '/requests.js',
-  '/theme.js',
-  '/utils.js',
-  '/icons/icon-192.webp',
-  '/icons/icon-512.webp'
-];
-
-// 检查是否支持ServiceWorker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then(registration => {
-        self.addEventListener('install', event => {
-          event.waitUntil(
-            caches.open(CACHE_NAME).then(cache => {
-              return cache.addAll(URLS_TO_CACHE);
-            })
-          );
-        });
-
-        self.addEventListener('fetch', event => {
-          event.respondWith(
-            caches.match(event.request).then(response => {
-              return response || fetch(event.request);
-            })
-          );
-        });
-        console.log('ServiceWorker注册成功:', registration);
-      })
-      .catch(error => {
-        console.error('ServiceWorker注册失败:', error);
-      });
-  });
-} else {
-  console.warn('当前浏览器不支持ServiceWorker');
-}
+const CACHE = 'ufi-candidate-static-v2';
+const ASSETS = ['/', '/index.html', '/style/style.css', '/script/main.js', '/script/requests.js', '/script/utils.js'];
+self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));
+self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE && (key.startsWith('ufi-candidate-') || key === 'ufi_tools_sw_cache')).map(key => caches.delete(key))))));
+self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin || !ASSETS.includes(url.pathname) || url.search) return;
+  event.respondWith(fetch(event.request).then(response => {
+    if (response.ok && response.type === 'basic') { const copy = response.clone(); event.waitUntil(caches.open(CACHE).then(cache => cache.put(event.request, copy))); }
+    return response;
+  }).catch(() => caches.match(event.request)));
+});

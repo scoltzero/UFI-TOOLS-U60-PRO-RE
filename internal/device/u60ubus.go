@@ -12,15 +12,24 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/u60"
 )
 
 const anonymousUBUSSession = "00000000000000000000000000000000"
 
 type U60UBUS struct {
-	base    *url.URL
-	session string
-	client  *http.Client
+	base        *url.URL
+	session     string
+	client      *http.Client
+	local       *u60.UBUS
+	metrics     *u60.Telemetry
+	allowWrites bool
+	cacheMu     sync.Mutex
+	cacheAt     time.Time
+	cache       map[string]any
 }
 
 func NewU60UBUS(baseURL, session string, client *http.Client) (*U60UBUS, error) {
@@ -42,7 +51,7 @@ func NewU60UBUS(baseURL, session string, client *http.Client) (*U60UBUS, error) 
 }
 
 func (u *U60UBUS) Status(ctx context.Context) (Status, error) {
-	v, err := u.GoFormGetMany(ctx, []string{"wa_inner_version", "modem_main_state", "network_type", "signalbar", "simcard_roam", "imei", "device_uptime", "current_wan_status", "sim_states"})
+	v, err := u.GoFormGetMany(ctx, []string{"model", "device_model", "modem_main_state", "network_type", "signalbar", "simcard_roam", "imei", "device_uptime", "current_wan_status", "sim_states"})
 	if err != nil {
 		return Status{}, err
 	}
@@ -51,9 +60,17 @@ func (u *U60UBUS) Status(ctx context.Context) (Status, error) {
 	state := strings.ToLower(v["modem_main_state"])
 	wan := strings.ToLower(v["current_wan_status"])
 	sim := strings.ToLower(v["sim_states"])
-	connected := state == "modem_connected" || state == "connected" || state == "1" || strings.Contains(wan, "connected")
-	simReady := (strings.Contains(sim, "ready") || v["simcard_roam"] != "-1") && state != "modem_sim_undetected"
-	return Status{Model: first(v, "wa_inner_version"), Manufacturer: "ZTE", IMEI: v["imei"], Signal: signal, NetworkType: v["network_type"], Connected: connected, SIMReady: simReady, Uptime: uptime}, nil
+	connected := state == "modem_connected" || state == "connected" || state == "1" || wan == "connected" || wan == "ipv4_ipv6_connected" || wan == "ipv4_connected" || wan == "ipv6_connected"
+	simReady := sim == "sim ready" || sim == "ready"
+	if sim == "" && state != "modem_sim_undetected" {
+		roam, present := v["simcard_roam"]
+		simReady = present && roam != "" && roam != "-1"
+	}
+	model := first(v, "model", "device_model")
+	if model == "" {
+		model = "U60 Pro"
+	}
+	return Status{Model: model, Manufacturer: "ZTE", IMEI: v["imei"], Signal: signal, NetworkType: v["network_type"], Connected: connected, SIMReady: simReady, Uptime: uptime}, nil
 }
 func (u *U60UBUS) GoFormGet(ctx context.Context, key string) (string, error) {
 	v, e := u.GoFormGetMany(ctx, []string{key})
@@ -66,35 +83,43 @@ func (u *U60UBUS) GoFormGet(ctx context.Context, key string) (string, error) {
 	}
 	return x, nil
 }
-func (u *U60UBUS) GoFormSet(context.Context, string, string) error { return ErrUnsupported }
 func (u *U60UBUS) GoFormGetMany(ctx context.Context, keys []string) (map[string]string, error) {
-	merged := map[string]any{}
-	for _, c := range [][2]string{{"zwrt_mc.device.manager", "get_device_info"}, {"zte_nwinfo_api", "nwinfo_get_netinfo"}, {"zwrt_zte_mdm.api", "get_sim_info_before"}, {"zwrt_router.api", "router_get_status_no_auth"}, {"zwrt_wlan", "report"}} {
-		v, e := u.call(ctx, c[0], c[1], map[string]any{})
-		if e != nil {
-			return nil, fmt.Errorf("U60 %s.%s: %w", c[0], c[1], e)
-		}
-		for k, x := range v {
-			merged[k] = x
-		}
+	values, err := u.Snapshot(ctx, keys)
+	if err != nil {
+		return nil, err
 	}
-	aliases := map[string]string{"imei": "modem_imei", "hw_version": "wa_version", "signal": "signalbar", "model": "wa_inner_version", "SSID1": "main2g_ssid", "wifi_ssid": "main2g_ssid", "AuthMode": "main2g_authmode"}
 	out := make(map[string]string, len(keys))
-	for _, k := range keys {
-		s := k
-		if aliases[k] != "" {
-			s = aliases[k]
+	for k, x := range values {
+		if x == nil {
+			continue
 		}
-		if x, ok := merged[s]; ok && x != nil {
+		switch x.(type) {
+		case map[string]any, []any, []map[string]any:
+			b, _ := json.Marshal(x)
+			out[k] = string(b)
+		default:
 			out[k] = fmt.Sprint(x)
 		}
 	}
 	return out, nil
 }
 func (u *U60UBUS) Call(ctx context.Context, module, procedure string, params map[string]any) (map[string]any, error) {
+	if !u.allowWrites && !readOnlyUBUS(procedure) {
+		return nil, ErrWriteDisabled
+	}
+	if !readOnlyUBUS(procedure) {
+		defer u.invalidateStatus()
+	}
 	return u.call(ctx, module, procedure, params)
 }
 func (u *U60UBUS) call(ctx context.Context, module, procedure string, params map[string]any) (map[string]any, error) {
+	if u.local != nil {
+		value := u.local.Call(ctx, module, procedure, params)
+		if u60.HasError(value) {
+			return nil, fmt.Errorf("%s.%s: %v", module, procedure, value["error"])
+		}
+		return value, nil
+	}
 	p := []map[string]any{{"jsonrpc": "2.0", "id": 1, "method": "call", "params": []any{u.session, module, procedure, params}}}
 	encoded, _ := json.Marshal(p)
 	target := *u.base
@@ -125,6 +150,9 @@ func (u *U60UBUS) call(ctx context.Context, module, procedure string, params map
 	var values map[string]any
 	if json.Unmarshal(result[0].Result[0], &code) != nil || code != 0 || json.Unmarshal(result[0].Result[1], &values) != nil {
 		return nil, errors.New("UBUS call failed")
+	}
+	if u60.HasError(values) {
+		return nil, errors.New("UBUS operation was rejected")
 	}
 	return values, nil
 }

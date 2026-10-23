@@ -1,0 +1,104 @@
+id	method	path	step	implementation_evidence	candidate_location	handler	same_path_alternatives	acceptance	parity
+R001	DELETE	/api/apn/manual	4.2	同路径方法不同，待核对			GET /api/apn/manual; POST /api/apn/manual	A/API；W/实际副作用	未验收
+R002	GET	/api/SELinux	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:71	"h.systemStatus(""getenforce"", ""mode"")"		A/API；R/读语义；是否有副作用待核对	未验收
+R003	GET	/api/adb/status	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:50	h.adbStatus		A/API；R/读语义；是否有副作用待核对	未验收
+R004	GET	/api/adb_alive	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:52	h.adbStatus		A/API；R/读语义；是否有副作用待核对	未验收
+R005	GET	/api/apn/all	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:104	h.apnAll		A/API；R/读语义；是否有副作用待核对	未验收
+R006	GET	/api/apn/auto	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:105	h.apnAll		A/API；R/读语义；是否有副作用待核对	未验收
+R007	GET	/api/apn/cid	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:111	h.apnCID		A/API；R/读语义；是否有副作用待核对	未验收
+R008	GET	/api/apn/manual	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:106	h.apnAll		A/API；R/读语义；是否有副作用待核对	未验收
+R009	GET	/api/apn/manual/enabled	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:112	h.apnEnabled		A/API；R/读语义；是否有副作用待核对	未验收
+R010	GET	/api/apn/mode	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:109	h.apnModeGet		A/API；R/读语义；是否有副作用待核对	未验收
+R011	GET	/api/auto_update/config	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:132	getKV/setKV loop		A/API；R/读语义；是否有副作用待核对	未验收
+R012	GET	/api/baseDeviceInfo	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:19	h.legacyBaseDeviceInfo		A/API；R/读语义；是否有副作用待核对	未验收
+R013	GET	/api/cellularUsage	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:45	h.recentCellular		A/API；R/读语义；是否有副作用待核对	未验收
+R014	GET	/api/check_update	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:57	h.updateCheck		A/API；R/读语义；是否有副作用待核对	未验收
+R015	GET	/api/connInfo	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:20	h.legacyConnInfo		A/API；R/读语义；是否有副作用待核对	未验收
+R016	GET	/api/device_id	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:23	"h.legacyStableID(""device_id"")"		A/API；R/读语义；是否有副作用待核对	未验收
+R017	GET	/api/device_uuid	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:22	"h.legacyStableID(""device_uuid"")"		A/API；R/读语义；是否有副作用待核对	未验收
+R018	GET	/api/download_update_status	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:59	h.updateStatus		A/API；R/读语义；是否有副作用待核对	未验收
+R019	GET	/api/get_custom_head	5.1/5.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:36	h.legacyGetCustomHead		A/API；R/读语义；是否有副作用待核对	未验收
+R020	GET	/api/get_log_status	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:32	h.legacyLogStatus		A/API；R/读语义；是否有副作用待核对	未验收
+R021	GET	/api/get_res_server	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:30	h.legacyResourceServer		A/API；R/读语义；是否有副作用待核对	未验收
+R022	GET	/api/get_task	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:96	h.getTask		A/API；R/读语义；是否有副作用待核对	未验收
+R023	GET	/api/get_theme	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:26	"h.legacyGetSetting(""theme"", legacyDefaultTheme)"		A/API；R/读语义；是否有副作用待核对	未验收
+R024	GET	/api/goform/goform_get_cmd_process	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:102	h.legacyGoFormGet		A/API；R/读语义；是否有副作用待核对	未验收
+R025	GET	/api/hasTTYD	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:46	h.ttydStatus		A/API；R/读语义；是否有副作用待核对	未验收
+R026	GET	/api/hosts	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/router.go:77	h.getHosts		A/API；R/读语义；是否有副作用待核对	未验收
+R027	GET	/api/is_weak_token	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:24	h.legacyWeakToken		A/API；R/读语义；是否有副作用待核对	未验收
+R028	GET	/api/list_tasks	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:39	h.listSchedulers		A/API；R/读语义；是否有副作用待核对	未验收
+R029	GET	/api/list_uploads	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:43	h.listUploads		A/API；R/读语义；是否有副作用待核对	未验收
+R030	GET	/api/log_clear	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:34	"h.getKV(""log_clear"", `{""enabled"":false,""interval_hours"":24}`)"		A/API；R/读语义；是否有副作用待核对	未验收
+R031	GET	/api/login_token/config	4.1	未在所查显式注册中定位，待研究				A/API；R/读语义；是否有副作用待核对	未验收
+R032	GET	/api/need_token	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/router.go:61	h.needToken		A/API；R/读语义；是否有副作用待核对	未验收
+R033	GET	/api/plugin/changelog	5.1/5.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:70	h.emptyPluginEvents		A/API；R/读语义；是否有副作用待核对	未验收
+R034	GET	/api/plugin/download	5.1/5.2	同路径方法不同，待核对			POST /api/plugin/download	A/API；R/读语义；是否有副作用待核对	未验收
+R035	GET	/api/plugin/list	5.1/5.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:62	h.pluginList		A/API；R/读语义；是否有副作用待核对	未验收
+R036	GET	/api/plugin/notifications	5.1/5.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:68	h.emptyPluginEvents		A/API；R/读语义；是否有副作用待核对	未验收
+R037	GET	/api/plugin/update/check	5.1/5.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:66	h.pluginUpdateCheck		A/API；R/读语义；是否有副作用待核对	未验收
+R038	GET	/api/plugin/update/download	5.1/5.2	同路径方法不同，待核对			POST /api/plugin/update/download	A/API；R/读语义；是否有副作用待核对	未验收
+R039	GET	/api/plugins_store	5.1/5.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:38	h.legacyPluginStore		A/API；R/读语义；是否有副作用待核对	未验收
+R040	GET	/api/power_status_forward_enabled	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:126	h.legacyPowerForwardGet		A/API；R/读语义；是否有副作用待核对	未验收
+R041	GET	/api/sms_forward_blacklist	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:118	"h.legacySMSGet(""blacklist"")"		A/API；R/读语义；是否有副作用待核对	未验收
+R042	GET	/api/sms_forward_curl	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:120	"h.legacySMSGet(""curl"")"		A/API；R/读语义；是否有副作用待核对	未验收
+R043	GET	/api/sms_forward_dingtalk	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:122	"h.legacySMSGet(""dingtalk"")"		A/API；R/读语义；是否有副作用待核对	未验收
+R044	GET	/api/sms_forward_enabled	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:114	"h.legacySMSGet(""enabled"")"		A/API；R/读语义；是否有副作用待核对	未验收
+R045	GET	/api/sms_forward_mail	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:124	"h.legacySMSGet(""mail"")"		A/API；R/读语义；是否有副作用待核对	未验收
+R046	GET	/api/sms_forward_method	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:116	"h.legacySMSGet(""method"")"		A/API；R/读语义；是否有副作用待核对	未验收
+R047	GET	/api/sms_forward_sms	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/router.go:83	h.getSMSForward		A/API；R/读语义；是否有副作用待核对	未验收
+R048	GET	/api/speedtest	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:92	h.legacySpeedtest		A/API；R/读语义；是否有副作用待核对	未验收
+R049	GET	/api/time/status	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/router.go:69	h.timeStatus		A/API；R/读语义；是否有副作用待核对	未验收
+R050	GET	/api/ttyd/status	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:47	h.ttydStatus		A/API；R/读语义；是否有副作用待核对	未验收
+R051	GET	/api/uploads/{name}	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/router.go:87	h.downloadUpload		A/API；R/读语义；是否有副作用待核对	未验收
+R052	GET	/api/usb_status	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:72	"h.systemStatus(""getprop sys.usb.state"", ""state"")"		A/API；R/读语义；是否有副作用待核对	未验收
+R053	GET	/api/version_info	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:21	h.legacyVersionInfo		A/API；R/读语义；是否有副作用待核对	未验收
+R054	GET	/api/wifi/qrcode	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:91	h.wifiQRCodeData		A/API；R/读语义；是否有副作用待核对	未验收
+R055	GET	/goform/goform_get_cmd_process	4.2	未在所查显式注册中定位，待研究				A/API；R/读语义；是否有副作用待核对	未验收
+R056	GET	/healthz	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/router.go:59	h.health		A/API；R/读语义；是否有副作用待核对	未验收
+R057	GET	/service-worker.js	4.4	静态资源存在；文件服务行为待验收	internal/webui/static/service-worker.js	FileServer		A/API；R/读语义；是否有副作用待核对	未验收
+R058	POST	/api/accept_terms	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:25	"h.legacySetFlag(""terms_accepted"")"		A/API；W/实际副作用	未验收
+R059	POST	/api/adb/mode	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:51	h.adbMode		A/API；W/实际副作用	未验收
+R060	POST	/api/add_task	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:40	h.setScheduler		A/API；W/实际副作用	未验收
+R061	POST	/api/apn/manual	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:107	h.apnSave		A/API；W/实际副作用	未验收
+R062	POST	/api/apn/manual/enable	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:113	h.apnEnable		A/API；W/实际副作用	未验收
+R063	POST	/api/apn/mode	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:110	h.apnModeSet		A/API；W/实际副作用	未验收
+R064	POST	/api/auto_update/check_now	4.4	同路径方法不同，待核对			GET /api/auto_update/check_now	A/API；W/实际副作用	未验收
+R065	POST	/api/auto_update/config	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:132	getKV/setKV loop		A/API；W/实际副作用	未验收
+R066	POST	/api/clear_task	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:42	h.clearTasks		A/API；W/实际副作用	未验收
+R067	POST	/api/delete_all_uploads_data	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:44	h.deleteAllUploads		A/API；W/实际副作用	未验收
+R068	POST	/api/delete_img	4.4	同路径方法不同，待核对			DELETE /api/delete_img	A/API；W/实际副作用	未验收
+R069	POST	/api/download_update	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:58	h.updateDownload		A/API；W/实际副作用	未验收
+R070	POST	/api/goform/goform_set_cmd_process	4.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:103	h.legacyGoFormSet		A/API；W/实际副作用	未验收
+R071	POST	/api/hosts	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/router.go:78	h.setHosts		A/API；W/实际副作用	未验收
+R072	POST	/api/hosts_restore	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:101	h.restoreHosts		A/API；W/实际副作用	未验收
+R073	POST	/api/install_update	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:60	h.updateInstall		A/API；W/实际副作用	未验收
+R074	POST	/api/log_clear	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:35	"h.setKV(""log_clear"")"		A/API；W/实际副作用	未验收
+R075	POST	/api/login_token/config	4.1	未在所查显式注册中定位，待研究				A/API；W/实际副作用	未验收
+R076	POST	/api/plugin/install	5.1/5.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:63	h.pluginInstallAlias		A/API；W/实际副作用	未验收
+R077	POST	/api/plugin/notification/read	5.1/5.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:69	h.emptyPluginEvents		A/API；W/实际副作用	未验收
+R078	POST	/api/plugin/uninstall	5.1/5.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:65	h.pluginUninstall		A/API；W/实际副作用	未验收
+R079	POST	/api/power_status_forward_enabled	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:127	h.legacyPowerForwardSet		A/API；W/实际副作用	未验收
+R080	POST	/api/remove_task	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:97	h.removeTaskBody		A/API；W/实际副作用	未验收
+R081	POST	/api/run_shell	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/router.go:71	h.runShell		A/API；W/实际副作用	未验收
+R082	POST	/api/set_custom_head	5.1/5.2	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:37	h.legacySetCustomHead		A/API；W/实际副作用	未验收
+R083	POST	/api/set_log_status	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:33	"h.legacySetSetting(""log_enabled"")"		A/API；W/实际副作用	未验收
+R084	POST	/api/set_nickname	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:28	h.legacySetNickname		A/API；W/实际副作用	未验收
+R085	POST	/api/set_res_server	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:31	"h.legacySetSetting(""resource_server_url"")"		A/API；W/实际副作用	未验收
+R086	POST	/api/set_theme	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:27	"h.legacySetSetting(""theme"")"		A/API；W/实际副作用	未验收
+R087	POST	/api/set_token	4.1	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:29	h.setToken		A/API；W/实际副作用	未验收
+R088	POST	/api/set_wakelock_status	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:90	h.setWakelock		A/API；W/实际副作用	未验收
+R089	POST	/api/sms_forward_blacklist	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:119	"h.legacySMSSet(""blacklist"")"		A/API；W/实际副作用	未验收
+R090	POST	/api/sms_forward_curl	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:121	"h.legacySMSSet(""curl"")"		A/API；W/实际副作用	未验收
+R091	POST	/api/sms_forward_dingtalk	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:123	"h.legacySMSSet(""dingtalk"")"		A/API；W/实际副作用	未验收
+R092	POST	/api/sms_forward_enabled	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:115	"h.legacySMSSet(""enabled"")"		A/API；W/实际副作用	未验收
+R093	POST	/api/sms_forward_mail	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:125	"h.legacySMSSet(""mail"")"		A/API；W/实际副作用	未验收
+R094	POST	/api/sms_forward_sms	4.3	字面路由/已核对循环命中；行为未验收	internal/httpapi/router.go:84	h.setSMSForward		A/API；W/实际副作用	未验收
+R095	POST	/api/time/config	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:131	getKV/setKV loop		A/API；W/实际副作用	未验收
+R096	POST	/api/time/sync	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/router.go:70	h.timeSync		A/API；W/实际副作用	未验收
+R097	POST	/api/ttyd/start	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:48	h.ttydStart		A/API；W/实际副作用	未验收
+R098	POST	/api/ttyd/stop	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:49	h.ttydStop		A/API；W/实际副作用	未验收
+R099	POST	/api/update_admin_pwd	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:56	"h.legacySetSetting(""official_web_password"")"		A/API；W/实际副作用	未验收
+R100	POST	/api/upload_file	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/router.go:86	h.uploadFile		A/API；W/实际副作用	未验收
+R101	POST	/api/upload_img	4.4	字面路由/已核对循环命中；行为未验收	internal/httpapi/compat.go:94	h.uploadFile		A/API；W/实际副作用	未验收
+R102	POST	/goform/goform_set_cmd_process	4.2	未在所查显式注册中定位，待研究				A/API；W/实际副作用	未验收
+R103	PUT	/api/apn/manual	4.2	同路径方法不同，待核对			GET /api/apn/manual; POST /api/apn/manual	A/API；W/实际副作用	未验收

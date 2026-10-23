@@ -3,7 +3,7 @@
 No command in this checklist contacts a U60 Pro.
 
 ```sh
-go version # must report go1.26.5 or newer within the 1.26 line
+go version # must report go1.26.10 or newer within the 1.26 line
 make test
 make lint
 go list -e ./... | rg -v '/third_party/' | xargs go test -race

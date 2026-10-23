@@ -25,6 +25,7 @@ type Report struct {
 
 type archiveEntry struct {
 	data     []byte
+	mode     int64
 	typeflag byte
 	linkname string
 }
@@ -98,7 +99,7 @@ func inspectTarGzip(data []byte, max int64) (map[string]archiveEntry, error) {
 		if _, exists := files[clean]; exists || header.Size < 0 || total+header.Size > max {
 			return nil, fmt.Errorf("duplicate or oversized archive entry %q", clean)
 		}
-		entry := archiveEntry{typeflag: header.Typeflag}
+		entry := archiveEntry{typeflag: header.Typeflag, mode: header.Mode}
 		switch header.Typeflag {
 		case tar.TypeReg, tar.TypeRegA:
 			body, err := io.ReadAll(io.LimitReader(tarReader, header.Size+1))
@@ -118,6 +119,31 @@ func inspectTarGzip(data []byte, max int64) (map[string]archiveEntry, error) {
 		files[clean] = entry
 	}
 	return files, nil
+}
+
+// ReadFile returns only an explicitly selected regular file from a verified
+// backup. It never extracts paths to disk or exposes unrelated configuration.
+func ReadFile(encrypted, password []byte, name string) (File, error) {
+	if _, err := Inspect(encrypted, password); err != nil {
+		return File{}, err
+	}
+	outer, err := decryptOpenSSL3DES(encrypted, password)
+	if err != nil {
+		return File{}, err
+	}
+	entries, err := inspectTarGzip(outer, 128<<20)
+	if err != nil {
+		return File{}, err
+	}
+	inner, err := inspectTarGzip(entries[InnerArchiveName].data, 512<<20)
+	if err != nil {
+		return File{}, err
+	}
+	entry, ok := inner[name]
+	if !ok || !entry.regular() {
+		return File{}, fmt.Errorf("required regular backup file missing: %s", name)
+	}
+	return File{Path: name, Mode: entry.mode, Data: append([]byte(nil), entry.data...)}, nil
 }
 
 func safeArchivePath(name string) bool {

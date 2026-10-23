@@ -3,21 +3,46 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
 )
 
 type authenticator struct {
-	cfg config.Config
-	now func() time.Time
+	cfg   config.Config
+	store *store.Store
+	now   func() time.Time
+}
+
+// Stored rotations take effect immediately and remain authoritative at the
+// next process start. The configured token is the initial fallback only.
+func (a authenticator) current(ctx context.Context) (authenticator, error) {
+	if a.store == nil {
+		return a, nil
+	}
+	token, err := a.store.Get(ctx, "config", "device_token")
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return a, err
+	}
+	if err == nil {
+		if token == "" {
+			return a, errors.New("stored application token is empty")
+		}
+		a.cfg.DeviceToken = token
+	}
+	a.store = nil
+	return a, nil
 }
 
 func (a authenticator) required() bool {
@@ -26,7 +51,12 @@ func (a authenticator) required() bool {
 
 func (a authenticator) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !a.required() || a.tokenOK(r) || a.legacySignatureOK(r) {
+		current, err := a.current(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, envelope{Code: 503, Message: "authentication storage unavailable"})
+			return
+		}
+		if !current.required() || current.tokenOK(r) || current.legacySignatureOK(r) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -39,6 +69,11 @@ func (a authenticator) tokenOK(r *http.Request) bool {
 		return false
 	}
 	provided := r.Header.Get("X-Device-Token")
+	if strings.HasPrefix(r.URL.Path, "/api/terminal/") && r.URL.Path != "/api/terminal/session" {
+		if cookie, err := r.Cookie("ufi_terminal"); err == nil && provided == "" {
+			provided = cookie.Value
+		}
+	}
 	if provided == "" {
 		provided = r.Header.Get("Authorization")
 		provided = strings.TrimPrefix(provided, "Bearer ")

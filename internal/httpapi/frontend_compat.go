@@ -3,12 +3,14 @@
 package httpapi
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/plugins"
@@ -22,9 +24,9 @@ func (h *handler) legacyBaseDeviceInfo(w http.ResponseWriter, r *http.Request) {
 		writeLegacyError(w, http.StatusBadGateway, "device unavailable")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	values := map[string]any{
 		"app_ver": h.deps.Version, "app_ver_code": "0", "model": status.Model,
-		"battery": nil, "daily_data": int64(0), "monthly_data": int64(0),
+		"battery": nil, "daily_data": nil, "monthly_data": nil,
 		"internal_available_storage": nil, "internal_used_storage": nil, "internal_total_storage": nil,
 		"external_total_storage": nil, "external_used_storage": nil, "external_available_storage": nil,
 		"cpu_temp_list": []any{}, "cpu_temp": nil, "client_ip": r.RemoteAddr,
@@ -32,13 +34,56 @@ func (h *handler) legacyBaseDeviceInfo(w http.ResponseWriter, r *http.Request) {
 		"cpuUsageInfo": map[string]any{}, "memInfo": map[string]any{},
 		"current_now": nil, "voltage_now": nil, "is_reached_data_flow_limit": false,
 		"signal": status.Signal, "network_type": status.NetworkType, "connected": status.Connected,
-	})
+	}
+	if source, ok := h.deps.Device.(device.TelemetryDevice); ok {
+		metrics, err := source.Telemetry(r.Context())
+		if err != nil {
+			writeLegacyError(w, http.StatusBadGateway, "telemetry unavailable")
+			return
+		}
+		for key, value := range metrics {
+			values[key] = value
+		}
+	}
+	now := time.Now().UTC()
+	days, e := h.deps.Store.DailyUsage(r.Context(), now.Format("2006-01")+"-01", now.Format("2006-01-02"))
+	if e != nil {
+		writeLegacyError(w, 500, "read candidate traffic")
+		return
+	}
+	var monthly int64
+	for _, day := range days {
+		monthly += day.Usage
+		if day.Date == now.Format("2006-01-02") {
+			values["daily_data"] = day.Usage
+		}
+	}
+	var calibration struct {
+		Period string `json:"period"`
+		Offset int64  `json:"offset"`
+	}
+	if raw, e := h.deps.Store.Get(r.Context(), "kv", "traffic_calibration"); e == nil {
+		_ = json.Unmarshal([]byte(raw), &calibration)
+		if calibration.Period == now.Format("2006-01")+"-01" {
+			monthly += calibration.Offset
+		}
+	}
+	if len(days) > 0 || calibration.Period == now.Format("2006-01")+"-01" {
+		values["monthly_data"] = monthly
+	}
+	values["traffic_timezone"] = "UTC"
+	writeJSON(w, http.StatusOK, values)
 }
 
-func (h *handler) legacyConnInfo(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"result": "success", "data": map[string]string{
-		"tcp": "0", "tcp_active": "0", "tcp_other": "0", "tcp6": "0", "udp": "0", "udp6": "0", "unix": "0",
-	}})
+func (h *handler) legacyConnInfo(w http.ResponseWriter, r *http.Request) {
+	if source, ok := h.deps.Device.(device.TelemetryDevice); ok {
+		metrics, err := source.Telemetry(r.Context())
+		if err == nil && metrics["connections"] != nil {
+			writeJSON(w, 200, map[string]any{"result": "success", "data": metrics["connections"]})
+			return
+		}
+	}
+	writeLegacyError(w, 503, "connection statistics unavailable")
 }
 
 func (h *handler) legacyVersionInfo(w http.ResponseWriter, r *http.Request) {
@@ -72,8 +117,13 @@ func (h *handler) legacyStableID(key string) http.HandlerFunc {
 	}
 }
 
-func (h *handler) legacyWeakToken(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]bool{"is_weak_token": len(h.deps.Config.DeviceToken) < 16})
+func (h *handler) legacyWeakToken(w http.ResponseWriter, r *http.Request) {
+	auth, err := h.auth.current(r.Context())
+	if err != nil {
+		writeLegacyError(w, http.StatusServiceUnavailable, "authentication storage unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"is_weak_token": len(auth.cfg.DeviceToken) < 16})
 }
 
 func (h *handler) legacySetFlag(key string) http.HandlerFunc {
@@ -138,15 +188,28 @@ func (h *handler) legacySetNickname(w http.ResponseWriter, r *http.Request) {
 	writeLegacySuccess(w)
 }
 
-func (h *handler) legacyResourceServer(w http.ResponseWriter, r *http.Request) {
+func (h *handler) resourceServer(ctx context.Context) (string, error) {
 	value := h.deps.Config.ResourceServerURL
-	if stored, err := h.deps.Store.Get(r.Context(), "kv", "resource_server_url"); err == nil {
+	stored, err := h.deps.Store.Get(ctx, "kv", "resource_server_url")
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	if err == nil {
 		var body map[string]any
 		if json.Unmarshal([]byte(stored), &body) == nil {
 			value = strings.TrimSpace(toString(body["res_server"]))
 		} else {
 			value = strings.Trim(stored, `"`)
 		}
+	}
+	return value, nil
+}
+
+func (h *handler) legacyResourceServer(w http.ResponseWriter, r *http.Request) {
+	value, err := h.resourceServer(r.Context())
+	if err != nil {
+		writeLegacyError(w, http.StatusInternalServerError, "read resource server")
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"res_server": value})
 }
@@ -223,6 +286,23 @@ func (h *handler) legacySetCustomHead(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) legacyGoFormGet(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("cmd") == "sms_data_total" {
+		page := r.URL.Query().Get("page")
+		if page == "" {
+			page = "0"
+		}
+		count := r.URL.Query().Get("data_per_page")
+		if count == "" {
+			count = "100"
+		}
+		data, err := device.CommandResult(r.Context(), h.deps.Device, map[string]string{"goformId": "zwrt_wms", "func": "zte_libwms_get_sms_data", "page": page, "data_per_page": count})
+		if err != nil {
+			writeLegacyError(w, deviceErrorStatus(err), err.Error())
+			return
+		}
+		writeJSON(w, 200, data)
+		return
+	}
 	keys := strings.Split(r.URL.Query().Get("cmd"), ",")
 	filtered := keys[:0]
 	for _, key := range keys {
@@ -235,10 +315,32 @@ func (h *handler) legacyGoFormGet(w http.ResponseWriter, r *http.Request) {
 		writeLegacyError(w, http.StatusBadRequest, "cmd is required")
 		return
 	}
-	values, err := device.GetMany(r.Context(), h.deps.Device, filtered)
+	var values map[string]any
+	var err error
+	if source, ok := h.deps.Device.(device.SnapshotDevice); ok {
+		values, err = source.Snapshot(r.Context(), filtered)
+	} else {
+		var flat map[string]string
+		flat, err = device.GetMany(r.Context(), h.deps.Device, filtered)
+		values = make(map[string]any, len(flat))
+		for key, value := range flat {
+			values[key] = value
+		}
+	}
 	if err != nil {
 		writeLegacyError(w, http.StatusBadGateway, "goform request failed")
 		return
+	}
+	// These fields describe the candidate session, not a second modem login.
+	for _, key := range filtered {
+		switch key {
+		case "loginfo":
+			values[key] = "ok"
+		case "cr_version":
+			if values[key] == "" {
+				values[key] = h.deps.Version
+			}
+		}
 	}
 	writeJSON(w, http.StatusOK, values)
 }
@@ -262,15 +364,41 @@ func (h *handler) legacyGoFormSet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for key, value := range body {
-			values[key] = strings.Trim(toString(value), `"`)
+			values[key] = scalarString(value)
 		}
+	}
+	if h.trafficCommand(w, r, values) {
+		return
 	}
 	result, err := device.CommandResult(r.Context(), h.deps.Device, values)
 	if err != nil {
-		writeLegacyError(w, http.StatusBadGateway, "goform operation failed")
+		message := "device operation failed"
+		if errors.Is(err, device.ErrWriteDisabled) {
+			message = "device writes are disabled; enable privileged compatibility explicitly"
+		}
+		if errors.Is(err, device.ErrInvalidArgument) {
+			message = err.Error()
+		}
+		if errors.Is(err, device.ErrUnsupported) {
+			message = "unsupported device operation"
+		}
+		writeLegacyError(w, deviceErrorStatus(err), message)
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+func deviceErrorStatus(err error) int {
+	switch {
+	case errors.Is(err, device.ErrWriteDisabled):
+		return http.StatusForbidden
+	case errors.Is(err, device.ErrInvalidArgument):
+		return http.StatusBadRequest
+	case errors.Is(err, device.ErrUnsupported):
+		return http.StatusUnprocessableEntity
+	default:
+		return http.StatusBadGateway
+	}
 }
 
 func writeLegacySuccess(w http.ResponseWriter) {

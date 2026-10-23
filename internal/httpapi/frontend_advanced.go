@@ -3,10 +3,10 @@
 package httpapi
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -47,13 +47,7 @@ func (h *handler) legacyIMSStatus(kind string) http.HandlerFunc {
 				return
 			}
 		}
-		stored, getErr := h.deps.Store.Get(r.Context(), "kv", fmt.Sprintf("%s_status_%d", kind, slot))
-		if getErr != nil && !errors.Is(getErr, sql.ErrNoRows) {
-			writeLegacyError(w, http.StatusInternalServerError, "read IMS state")
-			return
-		}
-		enabled := strings.Trim(stored, `"`) == "1"
-		writeJSON(w, http.StatusOK, map[string]bool{"enabled": enabled})
+		writeLegacyError(w, 503, "IMS state unavailable")
 	}
 }
 
@@ -197,10 +191,20 @@ func (h *handler) legacySetDataLimit(w http.ResponseWriter, r *http.Request) {
 		flowType = "monthly"
 	}
 	reference := strings.Trim(toString(request["data_check_reference"]), `"`)
-	if reference != "android" {
-		reference = "default"
+	if reference == "android" {
+		writeLegacyError(w, 422, "Android traffic reference is unavailable; select candidate statistics")
+		return
 	}
-	limit, _ := strconv.ParseFloat(strings.Trim(toString(request["data_flow_max_limit"]), `"`), 64)
+	reference = "default"
+	limit, parseErr := strconv.ParseFloat(strings.Trim(toString(request["data_flow_max_limit"]), `"`), 64)
+	if parseErr != nil || math.IsNaN(limit) || math.IsInf(limit, 0) {
+		writeLegacyError(w, 400, "finite traffic limit required")
+		return
+	}
+	if limit <= 0 && boolString(request["data_flow_limit_enabled"]) == "1" {
+		writeLegacyError(w, 400, "enabled limit must be positive")
+		return
+	}
 	if limit <= 0 {
 		limit = -1
 	}

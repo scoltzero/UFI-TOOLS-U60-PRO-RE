@@ -1,16 +1,34 @@
 # Replica policy
 
-## Parity target
+## Functional target (updated 2026-10-22)
 
-The reference is the closed `ufi-tools-u60pro` 0.3.2 build for the U60 Pro
-(go1.25.0, VCS revision `fe229709c6e4`, built 2026-08-15). The replica matches
-its observable behavior: routes, request parsing, response fields and types,
-error messages, persisted state, background workers, outbound services, file
-layout, and install/upgrade/uninstall lifecycle.
+The reference is the authorized closed `ufi-tools-u60pro` 0.3.2 build for the
+U60 Pro. The current objective is a usable independent implementation of its
+main functions. [PLAN.md](../PLAN.md) is the current scope and progress source;
+the original question bank remains an unchanged research reference.
 
-Behavior is "done" for a route or GoForm key only when its response has been
-compared field by field with a captured reference response from the same
-device state, and any side effect has been checked on the device and reverted.
+A selected function is complete when the actual UI or consumer can perform
+its operation, values and units are correct, required settings persist, failures
+are reported accurately, and original-system/user data protections remain intact.
+Local checks and physical-device verification are recorded separately.
+
+Preserve the API contracts actually used by the chosen frontend, plugins and
+DevUI/datad, or update those consumers together. Do not require a field-by-field
+match to every original response, identical wording/timing, the same database or
+internal layout, or reproduction of original defects. Reverse engineer only a
+specific implementation gap; a full reference behavior baseline is not a gate.
+
+## Script-install scope (2026-10-21)
+
+At the owner's request, stage 2 now delivers an isolated shell installer only.
+It uses `/data/ufi-tools-re` and port 2433 so the original system and service
+remain in place. The owner subsequently restored LAN script delivery (first
+install/uninstall/inverse recovery); it reboots through the vendor restore
+mechanism and still needs hardware validation. Windows/Android GUI delivery
+remains cancelled. This is
+the supported independent installation layout. Main-function completion
+and physical validation are tracked in PLAN.md. Initial script startup
+keeps automatic write workers, AT and fixed privileged operations disabled.
 
 ## Allowed inputs
 
@@ -32,11 +50,16 @@ non-commercial reimplementation. Allowed inputs are:
 - Proprietary Qualcomm tools, drivers, programmers and firmware images are
   never committed.
 
-## Reference behaviors kept on purpose
+## Independent implementation choices
 
-The replica follows the reference rather than redesigning it. This includes
-the official plugin store, device registration/reporting, notifications,
-update checks, and the UUID blacklist check. Where the replica still differs
-(for example signed updates or opt-in legacy shell), the difference is listed
-in `docs/research/compatibility-scope.md` as pending parity work, not as a
-policy.
+Self-hosted/configurable plugin sources, signed updates and opt-in legacy shell
+are intentional choices, not automatic parity defects. The reference's exclusive
+cloud registration/reporting, UUID checks, official-store and official-OTA
+protocols are not default requirements for this independent main-function target.
+Do not alter the original service or bypass its controls. Existing authentication,
+validation, update integrity and data-recovery protections remain in place.
+
+Reference timing, empty values or error wording need further study only when a
+supported consumer or functional failure makes them relevant. Existing evidence
+is retained with its original limits; a cancelled or untestable scenario is not
+reported as passed.

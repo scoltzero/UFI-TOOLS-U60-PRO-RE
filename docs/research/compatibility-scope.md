@@ -1,13 +1,13 @@
 # Compatibility scope
 
-This document is the sanitized handoff from behavior research to implementation.
+Current target (2026-10-22): main-function usability, as defined in [PLAN.md](../../PLAN.md), rather than complete reference behavior parity. This document is the sanitized handoff from research to implementation.
 Decompiler output stays in the ignored `research-inputs/` directory.
 
 ## Runtime contract
 
 - Target OS/architecture: Linux ARM64.
-- Default root: `/data/ufi-tools`.
-- Default HTTP address: `:2333`.
+- Supported isolated script installation: `/data/ufi-tools-re`, port `2433`; original `/data/ufi-tools` and `2333` stay in place.
+- The standalone code defaults still use the old root/port; direct development startup must pass an explicit separate data directory and address. This note changes documentation, not runtime defaults.
 - Optional terminal helper port: `1146`.
 - State: SQLite tables for config, key/value data, schedulers, SMS forwarding,
   recent/daily cellular totals, and uploaded blobs.
@@ -32,15 +32,17 @@ implementations.
 - `KANO_PLUGIN_START`, metadata, and `KANO_PLUGIN_END` markers.
 - The historical `kano_disabled` wrapper.
 
-## Pending parity work
+## Scope choices and remaining functional work
 
-These differences from the 0.3.2 reference remain and are scheduled to be
-closed (see `docs/replica-policy.md`):
+The self-hosted/configurable store, signed update validation and opt-in legacy
+authentication/shell are intentional choices. They need not be replaced by the
+reference's defaults. Original exclusive cloud registration/reporting, UUID
+checks and official-store/OTA protocols are not default deliverables.
 
-- The default store is self-hosted/configurable instead of the official store.
-- Update artifacts require an Ed25519 signature; the reference checks size and
-  ELF identity only.
-- Device registration/reporting, notifications and the blacklist check are not
-  implemented yet.
-- Legacy authentication and shell behavior are opt-in compatibility modes.
+Remaining main-function gaps are tracked in PLAN.md: real homepage telemetry,
+U60 device write/command integration, frontend/backend task and usage contracts,
+actual background effects, selected plugin execution, and physical validation.
+These are distinct from optional old-data import and exact-behavior research.
 
+Keep contracts needed by current consumers or update both ends. Preserve
+original/user data and existing authentication, integrity and recovery guarantees.

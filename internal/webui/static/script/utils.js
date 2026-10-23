@@ -49,13 +49,7 @@ function openLink(link) {
 
 //检测是否启用高级功能
 const checkAdvancedFunc = async () => {
-    const res = await runShellWithRoot('whoami')
-    if (res.content) {
-        if (res.content.includes('root')) {
-            return true
-        }
-    }
-    return false
+    try { const response = await fetchWithTimeout(`${KANO_baseURL}/capabilities`); const res = await response.json(); return response.ok && (res.data?.device_writes || res.data?.shell) } catch { return false }
 }
 
 function requestInterval(callback, interval) {

@@ -12,9 +12,12 @@
 /coverage/
 /tmp/
 /vendor/
+/output/
+__pycache__/
 
 # Research inputs and proprietary binaries must never be committed.
 /research-inputs/
+/research/
 /artifacts/private/
 *.apk
 *.exe

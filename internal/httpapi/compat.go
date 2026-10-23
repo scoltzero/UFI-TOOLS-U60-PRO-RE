@@ -11,8 +11,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
 )
 
 func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
@@ -31,8 +29,8 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/set_res_server", h.legacySetSetting("resource_server_url"))
 	mux.HandleFunc("GET /api/get_log_status", h.legacyLogStatus)
 	mux.HandleFunc("POST /api/set_log_status", h.legacySetSetting("log_enabled"))
-	mux.HandleFunc("GET /api/log_clear", h.getKV("log_clear", `{"enabled":false,"interval_hours":24}`))
-	mux.HandleFunc("POST /api/log_clear", h.setKV("log_clear"))
+	mux.HandleFunc("GET /api/log_clear", h.runtimeConfig("log_clear"))
+	mux.HandleFunc("POST /api/log_clear", h.runtimeConfig("log_clear"))
 	mux.HandleFunc("GET /api/get_custom_head", h.legacyGetCustomHead)
 	mux.HandleFunc("POST /api/set_custom_head", h.legacySetCustomHead)
 	mux.HandleFunc("GET /api/plugins_store", h.legacyPluginStore)
@@ -42,7 +40,7 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/clear_task", h.clearTasks)
 	mux.HandleFunc("GET /api/list_uploads", h.listUploads)
 	mux.HandleFunc("POST /api/delete_all_uploads_data", h.deleteAllUploads)
-	mux.HandleFunc("GET /api/cellularUsage", h.recentCellular)
+	mux.HandleFunc("GET /api/cellularUsage", h.cellularUsage)
 	mux.HandleFunc("GET /api/hasTTYD", h.ttydStatus)
 	mux.HandleFunc("GET /api/ttyd/status", h.ttydStatus)
 	mux.HandleFunc("POST /api/ttyd/start", h.ttydStart)
@@ -69,7 +67,7 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/plugin/notification/read", h.emptyPluginEvents)
 	mux.HandleFunc("GET /api/plugin/changelog", h.emptyPluginEvents)
 	mux.HandleFunc("GET /api/SELinux", h.systemStatus("getenforce", "mode"))
-	mux.HandleFunc("GET /api/usb_status", h.systemStatus("getprop sys.usb.state", "state"))
+	mux.HandleFunc("GET /api/usb_status", h.usbStatus)
 	mux.HandleFunc("GET /api/AT", h.legacyAT)
 	mux.HandleFunc("GET /api/volte_status", h.legacyIMSStatus("volte"))
 	mux.HandleFunc("POST /api/volte_status", h.legacySetIMSStatus("volte"))
@@ -105,6 +103,7 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/apn/auto", h.apnAll)
 	mux.HandleFunc("GET /api/apn/manual", h.apnAll)
 	mux.HandleFunc("POST /api/apn/manual", h.apnSave)
+	mux.HandleFunc("PUT /api/apn/manual/{id}", h.apnSave)
 	mux.HandleFunc("DELETE /api/apn/manual/{id}", h.apnDelete)
 	mux.HandleFunc("GET /api/apn/mode", h.apnModeGet)
 	mux.HandleFunc("POST /api/apn/mode", h.apnModeSet)
@@ -131,8 +130,8 @@ func (h *handler) registerCompatibilityRoutes(mux *http.ServeMux) {
 		{"/api/time/config", "time_config", `{"enabled":false}`},
 		{"/api/auto_update/config", "auto_update_config", `{"enabled":false}`},
 	} {
-		mux.HandleFunc("GET "+route.path, h.getKV(route.key, route.fallback))
-		mux.HandleFunc("POST "+route.path, h.setKV(route.key))
+		mux.HandleFunc("GET "+route.path, h.runtimeConfig(route.key))
+		mux.HandleFunc("POST "+route.path, h.runtimeConfig(route.key))
 	}
 
 }
@@ -157,15 +156,15 @@ func (h *handler) setToken(w http.ResponseWriter, r *http.Request) {
 	var request struct {
 		Token string `json:"token"`
 	}
-	if err := decodeJSON(r, &request); err != nil || len(request.Token) < 16 || len(request.Token) > 256 {
-		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "token must be between 16 and 256 characters"})
+	if err := decodeJSON(r, &request); err != nil || len(request.Token) < 8 || len(request.Token) > 256 || strings.IndexFunc(request.Token, func(c rune) bool { return c <= 32 || c >= 127 }) >= 0 {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "password must be 8–256 visible ASCII characters without spaces"})
 		return
 	}
 	if err := h.deps.Store.Set(r.Context(), "config", "device_token", request.Token); err != nil {
 		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save token"})
 		return
 	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Message: "token saved; restart the service to activate it"})
+	writeJSON(w, http.StatusOK, map[string]any{"result": "success", "code": 0, "message": "token updated"})
 }
 
 func (h *handler) setNickname(w http.ResponseWriter, r *http.Request) {
@@ -283,204 +282,6 @@ func (h *handler) goFormCompatibility(key string) http.HandlerFunc {
 	}
 }
 
-func apnKeys() []string {
-	keys := []string{
-		"apn_interface_version", "apn_m_profile_name", "profile_name", "apn_wan_dial",
-		"apn_select", "apn_pdp_type", "apn_pdp_select", "apn_pdp_addr", "index",
-		"apn_Current_index", "apn_auto_config", "apn_ipv6_apn_auto_config", "apn_mode",
-		"apn_wan_apn", "apn_ppp_auth_mode", "apn_ppp_username", "apn_ppp_passwd",
-		"dns_mode", "prefer_dns_manual", "standby_dns_manual", "apn_ipv6_wan_apn",
-		"apn_ipv6_pdp_type", "apn_ipv6_ppp_auth_mode", "apn_ipv6_ppp_username",
-		"apn_ipv6_ppp_passwd", "ipv6_dns_mode", "ipv6_prefer_dns_manual",
-		"ipv6_standby_dns_manual", "apn_num_preset",
-	}
-	for index := 0; index < 20; index++ {
-		keys = append(keys, "APN_config"+strconv.Itoa(index), "ipv6_APN_config"+strconv.Itoa(index))
-	}
-	return keys
-}
-
-func (h *handler) apnAll(w http.ResponseWriter, r *http.Request) {
-	if ubus, ok := h.deps.Device.(device.UBUSDevice); ok {
-		auto, err1 := ubus.Call(r.Context(), "zwrt_apn_object", "getAutoApnList", map[string]any{})
-		manual, err2 := ubus.Call(r.Context(), "zwrt_apn_object", "getManuApnList", map[string]any{})
-		mode, err3 := ubus.Call(r.Context(), "zwrt_apn_object", "get_apn_mode", map[string]any{})
-		if err1 != nil || err2 != nil || err3 != nil {
-			writeJSON(w, http.StatusForbidden, envelope{Code: 403, Message: "APN access requires an authorized UBUS session"})
-			return
-		}
-		writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{"auto": auto, "manual": manual, "mode": mode}})
-		return
-	}
-	values, err := device.GetMany(r.Context(), h.deps.Device, apnKeys())
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "read APN data"})
-		return
-	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: values})
-}
-
-func (h *handler) apnModeGet(w http.ResponseWriter, r *http.Request) {
-	value, err := h.deps.Device.GoFormGet(r.Context(), "apn_mode")
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "read APN mode"})
-		return
-	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]string{"mode": value}})
-}
-
-func (h *handler) apnModeSet(w http.ResponseWriter, r *http.Request) {
-	var request struct {
-		Mode  string `json:"mode"`
-		Index int    `json:"index"`
-	}
-	if err := decodeJSON(r, &request); err != nil || request.Mode != "auto" && request.Mode != "manual" || request.Index < 0 || request.Index > 19 {
-		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "mode must be auto/manual and index 0..19"})
-		return
-	}
-	if ubus, ok := h.deps.Device.(device.UBUSDevice); ok {
-		mode := 0
-		if request.Mode == "manual" {
-			mode = 1
-		}
-		if _, err := ubus.Call(r.Context(), "zwrt_apn_object", "set_apn_mode", map[string]any{"apn_mode": mode}); err != nil {
-			writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "set U60 APN mode"})
-			return
-		}
-		if mode == 1 {
-			if _, err := ubus.Call(r.Context(), "zwrt_apn_object", "enable_manu_apn_id", map[string]any{"profileId": request.Index}); err != nil {
-				writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "select U60 APN profile"})
-				return
-			}
-		}
-		writeJSON(w, http.StatusOK, envelope{Code: 0})
-		return
-	}
-	values := map[string]string{"goformId": "APN_PROC_EX", "apn_mode": request.Mode}
-	if request.Mode == "manual" {
-		values["apn_action"] = "set_default"
-		values["set_default_flag"] = "1"
-		values["apn_pdp_type"] = ""
-		values["index"] = strconv.Itoa(request.Index)
-	}
-	if err := device.Command(r.Context(), h.deps.Device, values); err != nil {
-		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "set APN mode"})
-		return
-	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0})
-}
-
-func (h *handler) apnSave(w http.ResponseWriter, r *http.Request) {
-	var request map[string]any
-	if err := decodeJSON(r, &request); err != nil {
-		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid APN profile"})
-		return
-	}
-	if ubus, ok := h.deps.Device.(device.UBUSDevice); ok {
-		if strings.Trim(toString(request["apn_ppp_passwd"]), `"`) != "" {
-			writeJSON(w, http.StatusUnprocessableEntity, envelope{Code: 422, Message: "encrypted U60 APN passwords must be configured in the official UI"})
-			return
-		}
-		params := map[string]any{
-			"profilename": toString(request["profile_name"]), "pdpType": toString(request["apn_pdp_type"]),
-			"wanapn": toString(request["apn_wan_apn"]), "pppAuthMode": toString(request["apn_ppp_auth_mode"]),
-			"username": toString(request["apn_ppp_username"]), "password": "",
-		}
-		procedure := "addManuApn"
-		if profile := strings.Trim(toString(request["profileId"]), `"`); profile != "" {
-			procedure, params["profileId"] = "modifyManuApn", profile
-		}
-		if _, err := ubus.Call(r.Context(), "zwrt_apn_object", procedure, params); err != nil {
-			writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "save U60 APN profile"})
-			return
-		}
-		writeJSON(w, http.StatusOK, envelope{Code: 0})
-		return
-	}
-	values := map[string]string{"goformId": "APN_PROC_EX", "apn_mode": "manual", "apn_action": "save"}
-	for key, value := range request {
-		if key == "goformId" || key == "apn_action" || key == "apn_mode" || len(key) > 64 {
-			continue
-		}
-		encoded := strings.Trim(toString(value), "\"")
-		if len(encoded) <= 256 {
-			values[key] = encoded
-		}
-	}
-	if err := device.Command(r.Context(), h.deps.Device, values); err != nil {
-		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "save APN profile"})
-		return
-	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0})
-}
-
-func (h *handler) apnDelete(w http.ResponseWriter, r *http.Request) {
-	index, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil || index < 0 || index > 19 {
-		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "APN index must be 0..19"})
-		return
-	}
-	if ubus, ok := h.deps.Device.(device.UBUSDevice); ok {
-		if _, err := ubus.Call(r.Context(), "zwrt_apn_object", "delete_manu_apn", map[string]any{"profileId": index}); err != nil {
-			writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "delete U60 APN profile"})
-			return
-		}
-		writeJSON(w, http.StatusOK, envelope{Code: 0})
-		return
-	}
-	err = device.Command(r.Context(), h.deps.Device, map[string]string{
-		"goformId": "APN_PROC_EX", "index": strconv.Itoa(index), "apn_mode": "manual", "apn_action": "delete",
-	})
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "delete APN profile"})
-		return
-	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0})
-}
-
-func (h *handler) apnCID(w http.ResponseWriter, r *http.Request) {
-	index, err := strconv.Atoi(r.URL.Query().Get("cid"))
-	if err != nil || index < 0 || index > 19 {
-		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "cid must be 0..19"})
-		return
-	}
-	keys := []string{"APN_config" + strconv.Itoa(index), "ipv6_APN_config" + strconv.Itoa(index)}
-	values, err := device.GetMany(r.Context(), h.deps.Device, keys)
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "read APN profile"})
-		return
-	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: values})
-}
-
-func (h *handler) apnEnabled(w http.ResponseWriter, r *http.Request) {
-	values, err := device.GetMany(r.Context(), h.deps.Device, []string{"apn_mode", "apn_Current_index", "apn_select"})
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "read active APN"})
-		return
-	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: values})
-}
-
-func (h *handler) apnEnable(w http.ResponseWriter, r *http.Request) {
-	var request struct {
-		Index int `json:"index"`
-	}
-	if err := decodeJSON(r, &request); err != nil || request.Index < 0 || request.Index > 19 {
-		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "index must be 0..19"})
-		return
-	}
-	err := device.Command(r.Context(), h.deps.Device, map[string]string{
-		"goformId": "APN_PROC_EX", "apn_mode": "manual", "apn_action": "set_default",
-		"set_default_flag": "1", "apn_pdp_type": "", "index": strconv.Itoa(request.Index),
-	})
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "enable APN profile"})
-		return
-	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0})
-}
-
 func toString(value any) string {
 	switch typed := value.(type) {
 	case string:
@@ -502,6 +303,10 @@ func (h *handler) ttydStatus(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *handler) ttydStart(w http.ResponseWriter, _ *http.Request) {
+	if !h.deps.Config.PrivilegedCompat {
+		writeLegacyError(w, 403, "terminal control requires privileged mode")
+		return
+	}
 	if h.deps.TTYD == nil {
 		writeJSON(w, http.StatusServiceUnavailable, envelope{Code: 503, Message: "ttyd supervisor unavailable"})
 		return
@@ -551,8 +356,8 @@ func (h *handler) adbStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *handler) adbMode(w http.ResponseWriter, r *http.Request) {
-	if h.deps.Runner == nil {
-		writeJSON(w, http.StatusServiceUnavailable, envelope{Code: 503, Message: "system runner unavailable"})
+	if !h.deps.Config.PrivilegedCompat || h.deps.Config.DeviceBackend != "u60-local" || h.deps.Runner == nil {
+		writeLegacyError(w, 403, "ADB changes require privileged local backend")
 		return
 	}
 	var request struct {
@@ -584,8 +389,6 @@ func (h *handler) adbMode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.deps.Store.Set(r.Context(), "kv", "adb_wifi_enabled", strconv.FormatBool(enabled))
-	if request.Password != "" {
-		_ = h.deps.Store.Set(r.Context(), "kv", "official_web_password", request.Password)
-	}
+
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{"enabled": enabled, "port": port}})
 }

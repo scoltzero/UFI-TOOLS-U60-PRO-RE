@@ -32,6 +32,12 @@ type MultiGoFormDevice interface {
 	GoFormGetMany(context.Context, []string) (map[string]string, error)
 }
 
+// SnapshotDevice preserves structured status values (Wi-Fi access points,
+// attached clients, and other arrays) instead of stringifying their JSON.
+type SnapshotDevice interface {
+	Snapshot(context.Context, []string) (map[string]any, error)
+}
+
 type GoFormCommandDevice interface {
 	GoFormCommand(context.Context, map[string]string) error
 }
@@ -44,11 +50,36 @@ type UBUSDevice interface {
 	Call(context.Context, string, string, map[string]any) (map[string]any, error)
 }
 
+type TelemetryDevice interface {
+	Telemetry(context.Context) (map[string]any, error)
+}
+
+func (s *Simulator) Telemetry(context.Context) (map[string]any, error) {
+	return map[string]any{
+		"simulated": true, "power_connected": true, "connections": map[string]any{"tcp": 0, "tcp_active": 0, "tcp_other": 0, "tcp6": 0, "udp": 0, "udp6": 0, "unix": 0}, "battery": 80, "battery_temperature": 32000,
+		"cpu_temp": "42000", "cpu_usage": 12.5, "mem_usage": 35.0,
+		"current_now": -150000, "voltage_now": 4100000,
+		"internal_total_storage": int64(2 << 30), "internal_used_storage": int64(512 << 20),
+		"internal_available_storage": int64(1536 << 20),
+		"cpuFreqInfo":                map[string]any{"cpu0": map[string]int{"cur": 1200, "max": 2208}},
+		"cpuUsageInfo":               map[string]float64{"cpu0": 12.5}, "cpu_temp_list": []int{42000},
+		"memInfo": map[string]int{"mem_total_kb": 1048576, "mem_available_kb": 681574},
+	}, nil
+}
+
 // Simulator is deterministic and never touches ADB, the LAN, or the host shell.
 type Simulator struct {
-	mu      sync.RWMutex
-	started time.Time
-	values  map[string]string
+	mu        sync.RWMutex
+	started   time.Time
+	values    map[string]string
+	apns      map[string]map[string]any
+	apnMode   int
+	apnID     string
+	apnNext   int
+	wifi      []map[string]any
+	blacklist []string
+	messages  []map[string]any
+	hostnames map[string]string
 }
 
 func NewSimulator() *Simulator {
@@ -58,6 +89,8 @@ func NewSimulator() *Simulator {
 			"network_type": "5G",
 			"signal":       "75",
 			"sim_status":   "ready",
+			"ppp_status":   "ppp_connected", "apn_mode": "auto", "network_signalbar": "4", "network_provider": "模拟网络",
+			"monthly_tx_bytes": "1048576", "monthly_rx_bytes": "2097152", "wifi_access_sta_num": "0", "lan_ipaddr": "192.168.8.1", "lan_netmask": "255.255.255.0", "dhcpEnabled": "1", "dhcpStart": "192.168.8.100", "dhcpEnd": "192.168.8.200", "dhcpLease_hour": "12h",
 		},
 	}
 }
@@ -70,7 +103,7 @@ func (s *Simulator) Status(context.Context) (Status, error) {
 		Manufacturer: "ZTE",
 		Signal:       75,
 		NetworkType:  s.values["network_type"],
-		Connected:    true,
+		Connected:    s.values["ppp_status"] == "ppp_connected",
 		SIMReady:     true,
 		Uptime:       int64(time.Since(s.started).Seconds()),
 	}, nil
@@ -108,21 +141,11 @@ func (s *Simulator) GoFormGetMany(ctx context.Context, keys []string) (map[strin
 }
 
 func (s *Simulator) GoFormCommand(_ context.Context, values map[string]string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for key, value := range values {
-		if key != "goformId" && key != "isTest" {
-			s.values[key] = value
-		}
-	}
-	return nil
+	_, err := s.simulateCommand(values)
+	return err
 }
-
-func (s *Simulator) GoFormCommandResult(ctx context.Context, values map[string]string) (map[string]any, error) {
-	if err := s.GoFormCommand(ctx, values); err != nil {
-		return nil, err
-	}
-	return map[string]any{"result": "success"}, nil
+func (s *Simulator) GoFormCommandResult(_ context.Context, values map[string]string) (map[string]any, error) {
+	return s.simulateCommand(values)
 }
 
 func GetMany(ctx context.Context, target Device, keys []string) (map[string]string, error) {

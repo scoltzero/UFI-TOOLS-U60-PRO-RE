@@ -3,11 +3,14 @@
 package httpapi
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/catalog"
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/plugins"
 )
 
 type installedPlugin struct {
@@ -16,6 +19,7 @@ type installedPlugin struct {
 	Version string `json:"version,omitempty"`
 	SHA256  string `json:"sha256,omitempty"`
 	Size    int64  `json:"size,omitempty"`
+	Enabled bool   `json:"enabled"`
 }
 
 func (h *handler) pluginList(w http.ResponseWriter, r *http.Request) {
@@ -24,10 +28,16 @@ func (h *handler) pluginList(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "list installed plugins"})
 		return
 	}
+	head, err := h.deps.Store.Get(r.Context(), "kv", "custom_head")
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		writeJSON(w, 500, envelope{Code: 500, Message: "read active plugins"})
+		return
+	}
 	items := make([]installedPlugin, 0, len(rows))
 	for _, row := range rows {
 		var item installedPlugin
 		if json.Unmarshal([]byte(row.Value), &item) == nil {
+			item.Enabled = plugins.ManagedEnabled(head, item.ID)
 			items = append(items, item)
 		}
 	}
@@ -56,17 +66,11 @@ func (h *handler) pluginInstallAlias(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "plugin download or integrity check failed"})
 		return
 	}
-	metadata := installedPlugin{ID: item.ID, Name: item.Name, Version: item.Version, SHA256: item.SHA256, Size: item.Size}
-	encoded, _ := json.Marshal(metadata)
-	if err := h.deps.Store.Set(r.Context(), "kv", "plugin."+item.ID, string(data)); err != nil {
-		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save plugin"})
+	if err := h.saveCatalogPlugin(r, item, data); err != nil {
+		writeJSON(w, http.StatusConflict, envelope{Code: 409, Message: "save active plugin: " + err.Error()})
 		return
 	}
-	if err := h.deps.Store.Set(r.Context(), "kv", "pluginmeta."+item.ID, string(encoded)); err != nil {
-		_ = h.deps.Store.Delete(r.Context(), "kv", "plugin."+item.ID)
-		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save plugin metadata"})
-		return
-	}
+
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: item})
 }
 
@@ -87,11 +91,11 @@ func (h *handler) pluginUninstall(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "plugin id is required"})
 		return
 	}
-	if err := h.deps.Store.Delete(r.Context(), "kv", "plugin."+id); err != nil {
-		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "remove plugin"})
+	if err := h.deps.Store.RemovePlugin(r.Context(), id); err != nil {
+		writeJSON(w, http.StatusConflict, envelope{Code: 409, Message: "remove active plugin: " + err.Error()})
 		return
 	}
-	_ = h.deps.Store.Delete(r.Context(), "kv", "pluginmeta."+id)
+
 	writeJSON(w, http.StatusOK, envelope{Code: 0})
 }
 
@@ -128,4 +132,13 @@ func (h *handler) pluginUpdateCheck(w http.ResponseWriter, r *http.Request) {
 
 func (h *handler) emptyPluginEvents(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: []any{}})
+}
+
+func (h *handler) saveCatalogPlugin(r *http.Request, item catalog.Plugin, data []byte) error {
+	metadata := installedPlugin{ID: item.ID, Name: item.Name, Version: item.Version, SHA256: item.SHA256, Size: item.Size}
+	encoded, err := json.Marshal(metadata)
+	if err != nil {
+		return err
+	}
+	return h.deps.Store.SavePlugin(r.Context(), item.ID, string(data), string(encoded))
 }

@@ -113,7 +113,7 @@ func TestUpstreamFrontendResponseShapes(t *testing.T) {
 func TestFrontendDataLimitContract(t *testing.T) {
 	router := testRouter(t, "")
 	set := httptest.NewRecorder()
-	router.ServeHTTP(set, httptest.NewRequest(http.MethodPost, "/api/set_data_limit", strings.NewReader(`{"data_flow_limit_enabled":"1","data_flow_max_limit":"1048576","data_flow_check_daily_or_monthly":"daily","data_check_reference":"android","data_limit_status_forward_enabled":true}`)))
+	router.ServeHTTP(set, httptest.NewRequest(http.MethodPost, "/api/set_data_limit", strings.NewReader(`{"data_flow_limit_enabled":"1","data_flow_max_limit":"1048576","data_flow_check_daily_or_monthly":"daily","data_check_reference":"default","data_limit_status_forward_enabled":true}`)))
 	if set.Code != http.StatusOK || !strings.Contains(set.Body.String(), `"result":"success"`) {
 		t.Fatalf("set data limit: %d %s", set.Code, set.Body.String())
 	}
@@ -262,7 +262,7 @@ func TestStateCompatibilityRoutes(t *testing.T) {
 	}{
 		{http.MethodPost, "/api/hosts", `{"content":"127.0.0.1 localhost"}`, http.StatusOK},
 		{http.MethodGet, "/api/hosts", "", http.StatusOK},
-		{http.MethodPost, "/api/scheduler", `{"id":"night","data":{"enabled":true}}`, http.StatusOK},
+		{http.MethodPost, "/api/scheduler", `{"id":"night","data":{"enabled":true,"next_unix":2000000000,"action":{"type":"goform_command","params":{"goformId":"DISCONNECT_NETWORK"}}}}`, http.StatusOK},
 		{http.MethodGet, "/api/scheduler", "", http.StatusOK},
 		{http.MethodPost, "/api/sms_forward_sms", `{"enabled":false}`, http.StatusOK},
 		{http.MethodGet, "/api/sms_forward_sms", "", http.StatusOK},
@@ -373,7 +373,10 @@ func TestADBModeUsesFixedCommand(t *testing.T) {
 	}
 	defer db.Close()
 	runner := &fakeRunner{}
-	router := New(Dependencies{Config: config.Defaults(), Store: db, Device: device.NewSimulator(), Runner: runner})
+	cfg := config.Defaults()
+	cfg.PrivilegedCompat = true
+	cfg.DeviceBackend = "u60-local"
+	router := New(Dependencies{Config: cfg, Store: db, Device: device.NewSimulator(), Runner: runner})
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/adb/mode", strings.NewReader(`{"enabled":true,"port":5555}`)))
 	if recorder.Code != http.StatusOK {
@@ -386,6 +389,15 @@ func TestADBModeUsesFixedCommand(t *testing.T) {
 
 func TestAPNModeCompatibility(t *testing.T) {
 	router := testRouter(t, "")
+	// Profiles must exist before they can be selected, including in the simulator.
+	for i := 0; i < 2; i++ {
+		created := httptest.NewRecorder()
+		router.ServeHTTP(created, httptest.NewRequest("POST", "/api/apn/manual", strings.NewReader(`{"profile_name":"test","apn_wan_apn":"internet","apn_pdp_type":3,"apn_ppp_auth_mode":0}`)))
+		if created.Code != 200 {
+			t.Fatalf("create APN fixture: %d %s", created.Code, created.Body.String())
+		}
+	}
+
 	set := httptest.NewRecorder()
 	router.ServeHTTP(set, httptest.NewRequest(http.MethodPost, "/api/apn/mode", strings.NewReader(`{"mode":"manual","index":3}`)))
 	if set.Code != http.StatusOK {

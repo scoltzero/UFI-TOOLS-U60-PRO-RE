@@ -9,15 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="icon" type="image/svg+xml" href="/favicon.webp">
     <title id="TITLE">UFI-TOOLS-WEB</title>
-    <script>
-        (() => {
-            try {
-                new Function('var obj = {}; return obj?.a;');
-            } catch (e) {
-                alert("您的浏览器版本过低，无法使用本页面，请升级浏览器版本后再试\nYour browser version is too old to use this page. Please update your browser and try again.")
-            }
-        })()
-    </script>
+    <!-- Do not use eval-based syntax probes: CSP rejection is not an old browser. -->
     <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="/style/style.css">
     <script src="/script/polyfill.min.js"></script>
@@ -504,6 +496,8 @@
                                 <button type="none" onclick="event.preventDefault();resetInput('EARFCN')"
                                     data-i18n="plugin_search_reset_btn">重置</button>
                             </div>
+                            <label>NR 频段（仅 5G）<input id="NR_LOCK_BAND" type="number" min="1" max="261" placeholder="例如 78"></label>
+                            <label>NR 子载波间隔 <select id="NR_LOCK_SCS"><option value="30">30 kHz</option><option value="15">15 kHz</option><option value="60">60 kHz</option><option value="120">120 kHz</option></select></label>
                             <button type="submit" class="btn"
                                 style="margin-top: 6px;;width: 100%;padding: 8px;font-size: 14px;"
                                 data-i18n="btn_lock_cell">锁基站!</button>
@@ -516,75 +510,19 @@
             </div>
             <!-- 登录模态框 -->
             <div class="mask" id="tokenModal" style="display: none">
-                <div class="modal" style="width: 90vw;max-width: 450px;">
-                    <div class="title" style="display: flex;justify-content: space-between;">
-                        <span data-i18n="token_title">请输入口令与密码</span>
-                        <button style="border-radius: 50%;" onclick="showLoginHelp()">?</button>
-                    </div>
-                    <div class="title" style="margin: 10px 0;">
-                        <p style="font-size: 12px;margin: 0;">
-                            <i>
-                                <span data-i18n="token_note_1">注：请填入口令和密码</span><br>
-                                <span data-i18n="token_note_2">第一个为UFI-TOOLS登录口令(默认为admin)</span><br>
-                                <span data-i18n="token_note_3">第二个为某兴后台的管理密码(在机器背面可以找到)</span><br>
-                                <span data-i18n="token_note_4">如果出现密码错误，请换一个登录方式</span>
-                            </i>
-                        </p>
-                    </div>
-                    <form class="content"
-                        style="padding: 0px 4px 0 4px;display: flex;flex-direction: column;align-items: center;">
-                        <input type="text" name="username" autocomplete="username" style="display: none;">
-                        <div style="display: flex;width: 100%;">
-                            <select style="width: 100%;margin-bottom: 10px;" class="select" name="" value="1"
-                                id="login_method">
-                                <option value="1" data-i18n="login_method_1">登录方式1</option>
-                                <option value="0" data-i18n="login_method_2">登录方式2</option>
-                            </select>
-                            <button type="button" data-i18n="no_pass_login_btn"
-                                onclick="event.preventDefault();noPassLogin()"
-                                style="flex-shrink: 0;margin: 4px 2px;">免密码登录</button>
+                <div class="modal" style="max-width: 400px;">
+                    <div class="title"><span data-i18n="candidate_login_title">登录 UFI-TOOLS</span></div>
+                    <p style="font-size: 13px;line-height:1.6" data-i18n="candidate_login_note">请输入本程序安装时生成的口令，无需原厂后台密码。</p>
+                    <form class="content" onsubmit="event.preventDefault();onTokenConfirm()" style="display:flex;flex-direction:column;gap:12px;">
+                        <label id="TOKEN_LABEL" for="TOKEN" data-i18n="candidate_token_label">本程序口令</label>
+
+                        <input id="TOKEN" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;" data-i18n-placeholder="candidate_token_placeholder" placeholder="输入安装时生成的口令">
+                        <label style="font-size:13px;"><input type="checkbox" id="loginRememberMe"><span data-i18n="remember-me">记住我</span></label>
+                        <div class="btn" style="text-align:right;">
+                            <button type="submit" data-i18n="confirm_btn">确认</button>
+                            <button type="button" onclick="closeModal('#tokenModal')" data-i18n="cancel_btn">取消</button>
                         </div>
-                        <div id="TOKEN_LABEL" style="align-self: start;margin-bottom: 10px;font-size: .85rem;"
-                            data-i18n="token_div_1">UFI 口令：</div>
-                        <div style="display: flex;width: 100%;margin-bottom: 10px;gap: 4px;">
-                            <input name="backend_password" autocomplete="current-password" id="TOKEN" type="password"
-                                data-i18n-placeholder="token_placeholder_token" placeholder="口令(UFI-TOOLS后台应用中查看)"
-                                style="width: 100%;text-indent: .5em;height: 30px;">
-                            <button type="button" onclick="switchPassInputShow(event,'#TOKEN')"
-                                style="background: none;;flex-shrink: 0;display: flex;align-items: center;justify-content: center;"><svg
-                                    style="pointer-events: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                    width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
-                                    stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
-                                    <circle cx="12" cy="12" r="3" />
-                                </svg></button>
-                        </div>
-                        <div style="align-self: start;margin-bottom: 10px;font-size: .85rem;" id="token_div_label2"
-                            data-i18n="token_div_2">
-                            某兴后台密码：</div>
-                        <div style="display: flex;width: 100%;margin-bottom: 10px;gap: 4px;" id="PWD_BLK">
-                            <input name="web_password" autocomplete="new-password" id="PWDINPUT" type="password"
-                                data-i18n-placeholder="token_placeholder_pwd" placeholder="官方后台的管理密码"
-                                style="width: 100%;text-indent: .5em; height: 30px;">
-                            <button type="button" onclick="switchPassInputShow(event,'#PWDINPUT')"
-                                style="background: none;flex-shrink: 0;display: flex;align-items: center;justify-content: center;"><svg
-                                    style="pointer-events: none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                    width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
-                                    stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
-                                    <circle cx="12" cy="12" r="3" />
-                                </svg></button>
-                        </div>
-                        <label class="user_select_none"
-                            style="align-self: start;margin-bottom: 10px;margin-top: 2px;font-size: .8rem;display: flex;align-items: center;justify-content: center;">
-                            <span data-i18n="remember-me">记住我</span>
-                            <input type="checkbox" style="margin: 0 6px;" id="loginRememberMe">
-                        </label>
                     </form>
-                    <div class="btn" style="text-align: right;">
-                        <button data-i18n="confirm_btn" onclick="onTokenConfirm()">确认</button>
-                        <button data-i18n="cancel_btn" onclick="closeModal('#tokenModal')">取消</button>
-                    </div>
                 </div>
             </div>
             <!-- 短信模态框 -->
@@ -606,7 +544,7 @@
                     <div class="btn"
                         style="height: 100%;min-width: 103px;display: flex;justify-content: space-between;gap: 6px;align-items: center;">
                         <button onclick="sendSMS()" style="height: 100%;" data-i18n="sms_modal_send_btn">发送</button>
-                        <button onclick="closeModal('#smsList')" style="height: 100%;"
+                        <button onclick="closeSmsList()" style="height: 100%;"
                             data-i18n="sms_modal_close_btn">关闭</button>
                     </div>
                 </div>
@@ -871,18 +809,7 @@
                                         name="data_flow_check_daily_or_monthly">
                                 </label>
                             </div>
-                            <div class="item" style="display: flex;gap: 10px;margin: 10px 0;">
-                                <span style="font-size: 14px;" data-i18n="data_ref">流量参考：</span>
-                                <label style="display: flex;align-items: center;">
-                                    <span style="margin-right: 6px;" data-i18n="official_back">官方后台</span>
-                                    <input style="margin: 0;" type="radio" value="official" name="data_check_reference">
-
-                                </label>
-                                <label style="display: flex;align-items: center;">
-                                    <span style="margin-right: 6px;" data-i18n="ufi_back">UFI后台</span>
-                                    <input style="margin: 0;" type="radio" value="ufi" name="data_check_reference">
-                                </label>
-                            </div>
+                            <p>统计来源：候选采样（UTC）。首个采样建立基线。</p>
                             <div class="item">
                                 <div style="display: flex;align-items: center;">
                                     <span data-i18n="disconnect_network_data_value">断网流量：</span>
@@ -953,6 +880,7 @@
                                     <th data-i18n="usage_data">用量</th>
                                 </tr>
                             </thead>
+                            <caption>UTC · 仅显示已采样日期</caption>
                             <tbody class="no-blur" id="DataUsageHistoryBody">
                                 <tr style="cursor: pointer;">
                                     <td colspan="2" data-i18n="no_data">暂无数据</td>
@@ -979,15 +907,18 @@
                         margin-bottom: 20px;
                         width: 66vw;
                         max-width: 400px;">
-                            <input style="display: none;" type="text" name="AccessPointIndex" value="0">
+                            <label>编辑频段 <select class="select" id="WIFI_EDIT_BAND"></select></label>
+                            <input style="display: none;" type="text" name="AccessPointIndex" value="main_2g">
                             <input style="display: none;" type="text" name="ApIsolate" value="0">
                             <input style="display: none;" type="text" name="ChipIndex" value="0">
                             <div class="dash-border-round"
                                 style="padding-top: 6px;padding-bottom: 6px;display: flex;justify-content: space-between;align-items: center;">
                                 <select class="select" id="WIFI_SWITCH" onchange="changeWIFISwitch(event)">
                                     <option value="0" data-i18n="wifi_option_off">WIFI:关闭</option>
+                                    <option value="1" data-i18n="wifi_option_on_preserve">WIFI:开启（保留频段）</option>
                                     <option value="chip1" data-i18n="wifi_option_24g">WIFI:2.4G</option>
                                     <option value="chip2" data-i18n="wifi_option_5g">WIFI:5G</option>
+                                    <option value="dual" disabled data-i18n="wifi_option_dual_current">WIFI:双频（当前状态）</option>
                                 </select>
                                 <span style="display: inline; font-size: 10px; text-align: right;"
                                     data-i18n="wifi_hint_no_submit">此选项即时更改无需确认。</span>
@@ -1062,7 +993,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="dash-border-round" style="text-align: center;">
+                                <div class="dash-border-round" style="text-align: center;display:none">
                                     <div data-i18n="wifi_qrcode_label">二维码</div>
                                     <div style="text-align: center">
                                         <img id="QRCodeImg" style="border-radius: 20px;" src="" alt="">
@@ -1217,7 +1148,7 @@
                                 style="min-width: 100px;padding: 6px 8px;" name="id" required /></label>
                         <label>
                             <span data-i18n="trigger_time_label">触发时间：</span><input
-                                style="min-width: 100px;padding: 6px 8px;" name="date_time" type="time" required />
+                                style="min-width: 100px;padding: 6px 8px;" name="date_time" type="datetime-local" required />
                         </label>
                         <label><span data-i18n="repeat_daily_label">重复执行: </span><input name="repeatDaily"
                                 type="checkbox" /></label>
@@ -1801,7 +1732,7 @@
                     <div class="title" data-i18n="change_token_title">更改登录口令</div>
 
                     <div class="title" style="margin-top: 10px;font-size: .7rem;" data-i18n="token_change_notice">
-                        密码最短为8位，至少包含字母和数字</div>
+                        使用 8～256 位英文、数字或符号，不含空格</div>
                     <form onsubmit="handleChangeToken(event)" id="changeTokenForm">
                         <div class="content" style="overflow-y: scroll; padding: 15px; width: 66vw; max-width: 400px;">
                             <div class="item" style="margin: 10px auto;">
@@ -2119,62 +2050,27 @@
             </div>
 
             <!-- APN设置模态框 -->
-            <div class="mask user_select_none" id="APNManagementModal" style="display: none">
-                <form id="APNManagementForm" class="modal"
-                    style="max-width: 440px;display: block;box-sizing: border-box;">
-                    <div class="title" data-i18n="apn_setting">APN设置</div>
-                    <div class="title" style="font-style: italic;;font-size: .62rem;margin-top: 10px;"
-                        data-i18n="apn_title_info">
-                        接入点名称(APN)用于您设备连接运营商网络的名称，该信息会根据您的sim卡自动匹配。如果无法上网可以尝试修改这组参数，参数作用请咨询当地运营商。
+            <div class="mask" id="APNManagementModal" style="display:none">
+                <div class="modal" style="max-width:480px;width:90vw">
+                    <div class="title">APN 设置</div>
+                    <p id="apn-message" role="status" style="font-size:13px;line-height:1.5"></p>
+                    <div class="content" style="display:grid;gap:12px">
+                        <label>连接模式 <select id="apn-mode" class="select"><option value="auto">自动</option><option value="manual">手动</option></select></label>
+                        <label>手动配置 <select id="apn-profile" class="select" style="width:100%"></select></label>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="apn-add">添加</button><button id="apn-edit">编辑</button><button id="apn-delete">删除</button><button id="apn-apply-mode">应用模式</button></div>
+                        <form id="candidate-apn-editor" style="display:none;gap:10px;flex-direction:column">
+                            <label>配置名称 <input name="profile_name" required maxlength="64"></label>
+                            <label>APN <input name="apn_wan_apn" required maxlength="100"></label>
+                            <label>PDP 类型 <select name="apn_pdp_type" class="select"><option value="1">IPv4</option><option value="2">IPv6</option><option value="3">IPv4 / IPv6</option></select></label>
+                            <label>认证 <select name="apn_ppp_auth_mode" class="select"><option value="0">无需认证</option><option value="1">PAP</option><option value="2">CHAP</option><option value="3">PAP / CHAP</option></select></label>
+                            <label>用户名 <input name="apn_ppp_username" autocomplete="off" maxlength="128"></label>
+                            <label>密码 <input name="apn_ppp_passwd" type="password" autocomplete="new-password" maxlength="128"></label>
+                            <small>需要认证的配置请重新输入账号和密码，本程序不回读已保存的密码。</small>
+                            <div><button type="submit">保存配置</button><button type="button" id="apn-cancel-edit">取消编辑</button></div>
+                        </form>
                     </div>
-                    <div class="content flex"
-                        style="flex-direction: column;gap: 10px;overflow-y: scroll; padding: 10px 0;font-size: 14px; width: 66vw; max-width: 400px;">
-                        <div class="flex" style="gap: 15px;">
-                            <span data-i18n="current_apn">当前APN</span><span name="apn_wan_apn"></span>
-                        </div>
-                        <div class="flex" style="gap: 10px;">
-                            <span data-i18n="auto_apn">自动APN</span>
-                            <label class="flex items-center"><input id="autoAPNMode"
-                                    onclick="onChangeIsAutoFrofile(true)" name="apn_mode" type="radio" checked><span
-                                    data-i18n="auto">自动</span></label>
-                            <label class="flex items-center"><input id="apnMode" onclick="onChangeIsAutoFrofile(false)"
-                                    name="apn_mode" type="radio"><span data-i18n="manual">手动</span></label>
-                        </div>
-                        <div id="autoProfileEl" class="flex items-center" style="gap: 10px;">
-                            <span data-i18n="profile">配置文件</span>
-                            <div class="profileItems flex items-center" style="flex-wrap: wrap;flex: 1;gap: 10px;">
-                                <div style="flex: 1">
-                                    <select class="select" style="min-width: 100px;width: 100%;" name="autoProfile"
-                                        id="autoProfile">
-                                    </select>
-                                </div>
-                                <div class="options" style="justify-self: start;">
-                                    <button class="btn" onclick="onViewAPNProfile(event)" data-i18n="view">查看</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="profileEl" class="flex items-center" style="display: none;gap: 10px;">
-                            <span data-i18n="profile">配置文件</span>
-                            <div class="profileItems flex items-center" style="flex-wrap: wrap;flex: 1;gap: 10px;">
-                                <div style="flex: 1">
-                                    <select class="select" name="profile" style="min-width: 100px;width: 100%;"
-                                        id="manualProfile">
-                                    </select>
-                                </div>
-                                <div class="options">
-                                    <button class="btn" id="addAPNProfile" data-i18n="add">添加</button>
-                                    <button class="btn" id="editAPNProfile" data-i18n="edit">编辑</button>
-                                    <button class="btn" id="delAPNProfile" data-i18n="del">删除</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="btn" style="text-align: right;">
-                        <button name="submit" data-i18n="submit_btn">提交</button>
-                        <button type="button" onclick="closeModal('#APNManagementModal')"
-                            data-i18n="close_btn">关闭</button>
-                    </div>
-                </form>
+                    <div class="btn"><button type="button" onclick="closeModal('#APNManagementModal')">关闭</button></div>
+                </div>
             </div>
 
             <!-- APN查看模态框 -->
@@ -2309,8 +2205,7 @@
         </div>
     </div>
     <div class="footer">
-        <p>Made by <a href="https://github.com/kanoqwq/UFI-TOOLS" target="_blank">MiniKano</a> with love ❤️&nbsp;<a
-                href="javascript:;" onclick="showModal('#payModal')" data-i18n="pay_title">打赏作者</a></p>
+        <p><a href="/re-admin/">候选系统管理 · 文件 / Hosts / 日志 / 后台设置</a></p>
     </div>
 
     <div class="toolbar">

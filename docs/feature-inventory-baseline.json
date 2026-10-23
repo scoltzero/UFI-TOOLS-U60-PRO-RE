@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-21",
+  "target": "U60 Pro MU5250 / closed 0.3.2",
+  "sources": {
+    "research-inputs/ghidra-0.3.2/routes-0.3.2.txt": "ef19c38d70033b4d32895da28d45c94b8357a016425bff0c039fd644b12ab1a1",
+    "research-inputs/ghidra-0.3.2/goform-keys.txt": "a4ec0511dab6985d690700404f121abf510e7f0051c9ffd457d0db6ead2fc78c",
+    "research-inputs/frontend-0.3.2/index.html": "71fda0f2ede137634a9d3976553d3c8ecf40410527614312b1f112af801caf7a"
+  },
+  "counts": {
+    "reference_routes": 103,
+    "reference_goform_keys": 126,
+    "reference_id_controls": 124,
+    "candidate_extra_static_routes": 48
+  },
+  "route_locator_counts": {
+    "同路径方法不同，待核对": 6,
+    "字面路由/已核对循环命中；行为未验收": 92,
+    "未在所查显式注册中定位，待研究": 4,
+    "静态资源存在；文件服务行为待验收": 1
+  },
+  "coverage_check": {
+    "all_input_routes_enumerated_once": true,
+    "all_input_keys_enumerated_once": true,
+    "all_selected_reference_controls_enumerated": true
+  },
+  "limitations": [
+    "参考路由/字段表来自已有静态提取，不保证穷尽隐藏或动态行为。",
+    "候选路由仅检查两个注册文件的字面量和两个已核对循环；没有运行HTTP路由匹配。",
+    "GoForm只记录候选字面量定位，不据此认定实现/缺失/兼容。",
+    "控件仅覆盖参考HTML中带id的button/select/input/textarea；动态控件、链接和脚本绑定另在业务矩阵中跟踪。",
+    "字段名、路径和控件ID均为协议/界面事实；不输出响应、输入值、真实凭据或设备标识。"
+  ]
+}

@@ -1,5 +1,9 @@
 # Non-release completion audit
 
+This is a historical audit snapshot. The first functional beta now uses Go 1.26.10
+locally and in CI; older toolchain scan results below describe their original
+validation time. See [the current plan](../PLAN.md) for the active scope and status.
+
 Audit scope: all requested offline implementation and validation work except
 signing, publishing, official release distribution, and—at the owner's explicit
 request—device mutation, reboot, destructive restore, and real-device fault

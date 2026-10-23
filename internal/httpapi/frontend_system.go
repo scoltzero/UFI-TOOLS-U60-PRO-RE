@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,7 +23,7 @@ func (h *handler) legacyShell(w http.ResponseWriter, r *http.Request) {
 		Command string `json:"command"`
 		Timeout int    `json:"timeout"`
 	}
-	if err := decodeJSON(r, &request); err != nil || strings.TrimSpace(request.Command) == "" || len(request.Command) > 4096 {
+	if err := decodeJSON(r, &request); err != nil || strings.TrimSpace(request.Command) == "" || len(request.Command) > maxShellCommandSize {
 		writeLegacyError(w, http.StatusBadRequest, "invalid shell command")
 		return
 	}
@@ -120,7 +121,12 @@ func (h *handler) legacySMSGet(kind string) http.HandlerFunc {
 		case "blacklist":
 			object = map[string]any{"phone": firstObjectString(object, "phone"), "keywords": firstObjectString(object, "keywords")}
 		case "curl":
-			object = map[string]any{"curl_text": firstObjectString(object, "curl_text", "body")}
+			if object["curl_text"] == nil {
+				encoded, _ := json.MarshalIndent(object, "", "  ")
+				object = map[string]any{"curl_text": string(encoded)}
+			} else {
+				object = map[string]any{"curl_text": firstObjectString(object, "curl_text")}
+			}
 		case "dingtalk":
 			object = map[string]any{"webhook_url": firstObjectString(object, "webhook_url", "webhook", "url"), "secret": firstObjectString(object, "secret"), "forward_dev_info": firstObjectString(object, "forward_dev_info")}
 		case "mail":
@@ -147,8 +153,17 @@ func (h *handler) legacySMSSet(kind string) http.HandlerFunc {
 			body["enabled"] = value
 		}
 		if kind == "curl" {
+			if input := firstObjectString(body, "curl_text"); input != "" {
+				parsed, err := smsforward.ParseHTTPConfig(input)
+				if err != nil {
+					writeLegacyError(w, 400, err.Error())
+					return
+				}
+				for key, value := range parsed {
+					body[key] = value
+				}
+			}
 			body["url"] = firstObjectString(body, "url")
-			body["body"] = firstObjectString(body, "body", "curl_text")
 			_ = h.deps.Store.Set(r.Context(), "kv", "sms_forward_method", `"CURL"`)
 		} else if kind == "dingtalk" {
 			body["webhook"] = firstObjectString(body, "webhook", "webhook_url")
@@ -158,6 +173,17 @@ func (h *handler) legacySMSSet(kind string) http.HandlerFunc {
 			body["to"] = firstObjectString(body, "to", "smtp_to")
 			body["username"] = firstObjectString(body, "username", "smtp_username")
 			body["password"] = firstObjectString(body, "password", "smtp_password")
+			portText := firstObjectString(body, "port", "smtp_port")
+			if portText != "" {
+				port, err := strconv.Atoi(portText)
+				if err != nil || port < 1 || port > 65535 {
+					writeLegacyError(w, 400, "invalid SMTP port")
+					return
+				}
+				body["port"] = port
+				body["implicit_tls"] = port == 465
+			}
+			body["from"] = firstObjectString(body, "from", "smtp_username", "username")
 			_ = h.deps.Store.Set(r.Context(), "kv", "sms_forward_method", `"SMTP"`)
 		}
 		encoded, _ := json.Marshal(body)

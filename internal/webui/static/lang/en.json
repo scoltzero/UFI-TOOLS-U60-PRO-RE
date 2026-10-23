@@ -264,6 +264,8 @@
     "wifi_option_off": "WIFI: Off",
     "wifi_option_24g": "WIFI: 2.4G",
     "wifi_option_5g": "WIFI: 5G",
+    "wifi_option_dual_current": "WIFI: 2.4G + 5G (current)",
+    "wifi_option_on_preserve": "WIFI: On (keep bands)",
     "wifi_hint_no_submit": "Takes effect immediately.",
     "wifi_ssid_label": "SSID：",
     "wifi_ssid_placeholder": "Enter SSID",
@@ -739,8 +741,8 @@
     "device_usb_exp": "Device Mode (connect to PC)",
     "weak_token_detected": "A weak password was detected. You must change it to keep your device secure.",
     "change_token_now": "Change Now",
-    "token_change_notice": "Password must be at least 8 characters and include letters and numbers.",
-    "toast_token_invalid": "Password must include letters and numbers!",
+    "token_change_notice": "Use 8–256 letters, numbers or symbols, without spaces.",
+    "toast_token_invalid": "Use 8–256 visible ASCII characters without spaces.",
     "toast_token_too_short": "Password must be at least 8 characters!",
     "three_days_later": "Remind me in three days",
     "three_days_later_info": "To ensure the user updates the passcode, this reminder will appear again in three days.",
@@ -856,5 +858,9 @@
     "change_pass_tip2": "The password currently saved by UFI-TOOLS is:",
     "plugin_override_mod": "Plugin exists, overwritten install",
     "export": "Export",
-    "reinstall": "Reinstall"
+    "reinstall": "Reinstall",
+    "candidate_login_title": "Sign in to UFI-TOOLS",
+    "candidate_login_note": "Use the token generated for this installation. The factory router password is not required.",
+    "candidate_token_label": "Application token",
+    "candidate_token_placeholder": "Enter the installation token"
 }

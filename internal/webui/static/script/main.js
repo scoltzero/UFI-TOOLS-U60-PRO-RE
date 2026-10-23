@@ -51,39 +51,35 @@ window.UFI_DATA = new Proxy({}, {
     }
 });
 
-//customHead
-(() => {
-    getCustomHead().then((head_text) => {
-        if (head_text) {
-            try {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(head_text, 'text/html');
-
-                doc.querySelectorAll('style, link, meta').forEach(el => {
-                    document.head.appendChild(el.cloneNode(true));
-                });
-
-                doc.querySelectorAll('script').forEach(scriptEl => {
-                    try {
-                        const newScript = document.createElement('script');
-                        if (scriptEl.src) {
-                            newScript.src = scriptEl.src;
-                        } else {
-                            newScript.textContent = scriptEl.textContent;
-                        }
-                        if (scriptEl.type) newScript.type = scriptEl.type;
-
-                        document.head.appendChild(newScript);
-                    } catch (e) {
-                        createToast(t('toast_head_resove_failed'));
-                    }
-                })
-            } catch (e) {
-                createToast(t('toast_head_resove_failed'));
-            }
-        }
-    })
-})();
+// Load saved plugins after authentication, once per page even if login and
+// startup overlap. A rejected/empty read can be retried after successful login.
+let customHeadLoaded = false
+let customHeadLoading = null
+const loadCustomHead = () => {
+    if (customHeadLoaded) return Promise.resolve()
+    if (customHeadLoading) return customHeadLoading
+    customHeadLoading = (async () => {
+        const head_text = await getCustomHead()
+        if (!head_text) return
+        const doc = new DOMParser().parseFromString(head_text, 'text/html')
+        doc.querySelectorAll('style, link, meta').forEach(el => {
+            document.head.appendChild(el.cloneNode(true))
+        })
+        doc.querySelectorAll('script').forEach(scriptEl => {
+            const newScript = document.createElement('script')
+            if (scriptEl.src) newScript.src = scriptEl.src
+            else newScript.textContent = scriptEl.textContent
+            if (scriptEl.type) newScript.type = scriptEl.type
+            document.head.appendChild(newScript)
+        })
+        customHeadLoaded = true
+    })().catch(error => {
+        console.error('Plugin loading failed:', error)
+        createToast(t('toast_head_resove_failed'))
+    }).finally(() => { customHeadLoading = null })
+    return customHeadLoading
+}
+loadCustomHead()
 
 //ttyd
 if (!localStorage.getItem('ttyd_port')) {
@@ -159,6 +155,7 @@ needToken(true, 30).then(() => {
     }, 100);
     main_func()
 }).catch((e) => {
+    console.error('Application initialization failed:', e)
     if (overlay) {
         overlay.innerHTML = `
         <p>${e.message}</p>
@@ -484,110 +481,30 @@ function main_func() {
         initSleepTime()
         initAdvanceTools()
         QOSRDPCommand("AT+CGEQOSRDP=1")
-        initTerms()
+        // The independent candidate keeps license notices without forcing the upstream service agreement.
         initCheckWeakToken()
         initTTYD()
     }
 
-    let toastTimer = null
     const onTokenConfirm = debounce(async () => {
-        const createTimer = () => setTimeout(() => {
-            createToast(t('toast_logining'), 'pink')
-        }, 2000)
-        // psw_fail_num_str
+        const token = document.querySelector('#TOKEN')?.value.trim() || ''
         try {
-            // 检测登录方法
-            const login_method = document.querySelector('#login_method')
-            if (login_method) {
-                loginMethod = login_method.value == '1' ? "1" : "0"
-                //持久化
-                localStorage.setItem('login_method', loginMethod)
-            }
-            toastTimer && clearTimeout(toastTimer)
-            createToast(t('toast_login_checking'), '', 2000)
-            toastTimer = createTimer()
             await needToken()
-            toastTimer && clearTimeout(toastTimer)
-            let tokenInput = document.querySelector('#TOKEN')
-            let pwdInput = document.querySelector('#PWDINPUT')
-            let token = tokenInput && (tokenInput.value)
-            let password = pwdInput && (pwdInput.value)
-            if (!password || !password?.trim()) return createToast(t('toast_please_input_pwd'), 'red')
-            KANO_PASSWORD = password.trim()
-            if (isNeedToken) {
-                if (!token || !token?.trim()) return createToast(t('toast_please_input_token'), 'red')
+            if (isNeedToken && !token) return createToast(t('toast_please_input_token'), 'red')
+            KANO_TOKEN = token
+            common_headers.authorization = token ? 'Bearer ' + token : ''
+            if (!(await login())) {
+                KANO_TOKEN = null
+                common_headers.authorization = ''
+                return createToast(t('toast_token_failed'), 'red')
             }
-            KANO_TOKEN = SHA256(token.trim()).toLowerCase()
-            common_headers.authorization = KANO_TOKEN
-
-            const data = new URLSearchParams({
-                cmd: 'psw_fail_num_str,login_lock_time'
-            })
-            data.append('isTest', 'false')
-            data.append('_', Date.now())
-            toastTimer = createTimer()
-            const res = await fetchWithTimeout(KANO_baseURL + "/goform/goform_get_cmd_process?" + data.toString(), {
-                method: "GET",
-                headers: {
-                    ...common_headers,
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-            }, 3000)
-            toastTimer && clearTimeout(toastTimer)
-
-            if (res.status != 200) {
-                if (res.status == 401) {
-                    return createToast(t('toast_token_failed'), 'red')
-                }
-                throw new Error(res.status + "：" + t('toast_login_failed_catch'), 'red')
-            }
-
-            toastTimer = createTimer()
-            let { psw_fail_num_str, login_lock_time } = await res.json()
-            toastTimer && clearTimeout(toastTimer)
-
-            if (psw_fail_num_str == '0' && login_lock_time != '0') {
-                createToast(`${t('toast_pwd_failed_limit')}${login_lock_time}S`, 'red')
-                out()
-                toastTimer = createTimer()
-                await needToken()
-                toastTimer && clearTimeout(toastTimer)
-                return null
-            }
-            const cookie = await login()
-            toastTimer && clearTimeout(toastTimer)
-            if (!cookie) {
-                createToast(t('toast_pwd_failed') + (psw_fail_num_str != undefined ? ` ${t('toast_pwd_failed_count')}：${psw_fail_num_str}` : ''), 'red')
-                out()
-                toastTimer = createTimer()
-                await needToken()
-                toastTimer && clearTimeout(toastTimer)
-                return null
-            }
-            //更新后端ADMIN_PWD字段
-            const update_res = await updateAdminPsw(password.trim())
-            if (!update_res || update_res.result != 'success') {
-                console.error('Update admin password failed:', update_res ? update_res.message : 'No response');
-            }
+            storeLoginToken(token, !!document.querySelector('#loginRememberMe')?.checked)
             createToast(t('toast_login_success'), 'green')
-            localStorage.setItem('kano_sms_pwd', password.trim())
-            localStorage.setItem('kano_sms_token', SHA256(token.trim()).toLowerCase())
             closeModal('#tokenModal')
+            isNotLoginOnce = true
+            await loadCustomHead()
             initRenderMethod()
-            //记住密码
-            const loginRememberMe = document.querySelector('#loginRememberMe')
-            if (loginRememberMe && loginRememberMe.checked) {
-                //AES加密存储密码
-                if (CryptoJS) {
-                    const payload = CryptoJS.AES.encrypt(`${password.trim()}<kano_CryptoJS_split>${token.trim()}`, 'kano_secret_key_1145141919810721')
-                    localStorage.setItem('kano_remembered_loginfo', payload)
-                }
-            } else if (loginRememberMe && !loginRememberMe.checked) {
-                localStorage.removeItem('kano_remembered_loginfo')
-            }
-        }
-        catch (e) {
-            toastTimer && clearTimeout(toastTimer)
+        } catch {
             createToast(t('toast_login_failed_catch'), 'red')
         }
     }, 200)
@@ -596,7 +513,7 @@ function main_func() {
     function out() {
         smsSender && smsSender()
         localStorage.removeItem('kano_sms_pwd')
-        localStorage.removeItem('kano_sms_token')
+        clearLoginToken()
         closeModal('#smsList')
         clearTimeout(timer_out)
         timer_out = setTimeout(() => {
@@ -605,17 +522,10 @@ function main_func() {
     }
 
     let initRequestData = async () => {
-        const PWD = localStorage.getItem('kano_sms_pwd')
-        const TOKEN = localStorage.getItem('kano_sms_token')
-        if (!PWD) {
-            return false
-        }
-        if (isNeedToken && !TOKEN) {
-            return false
-        }
-        KANO_TOKEN = TOKEN
-        common_headers.authorization = KANO_TOKEN
-        KANO_PASSWORD = PWD
+        const token = storedLoginToken()
+        if (isNeedToken && !token) return false
+        KANO_TOKEN = token
+        common_headers.authorization = token ? 'Bearer ' + token : ''
         return true
     }
 
@@ -744,106 +654,37 @@ function main_func() {
         }
     }
 
+    const closeSmsList=()=>{smsSender&&smsSender();smsSender=null;closeModal("#smsList")}
+
     let isFirstRender = true
     let lastRequestSmsIds = null
     let cachedSmsRes = null
     let handleSmsRender = async () => {
-        let list = document.querySelector('#sms-list')
-        if (!list) createToast(t('toast_sms_list_node_not_found'), 'red')
-        if (isFirstRender) {
-            list.innerHTML = ` <li><h2 style="padding: 30px;text-align:center;height:100vh">Loading...</h2></li>`
-        }
-        showModal('#smsList')
-        let res = null
+        const list = document.querySelector('#sms-list'); showModal('#smsList')
         try {
-            res = await getSms()
-        } catch (e) {
-            res = null
-        }
-        if (res && (res.length > 0)) {
-            cachedSmsRes = safeClone(res)
-        } else {
-            if (isFirstRender == true) {
-                return
+            const messages = await getSms(); if (!Array.isArray(messages)) throw new Error('无法读取短信')
+            cachedSmsRes = messages; list.replaceChildren()
+            for (const item of messages) {
+                const row = document.createElement('li'); row.className='sms-item'; row.dataset.smsId=item.id; row.dataset.smsPhone=item.number
+                const body = item.content_encoding === 'text' ? item.content : decodeBase64(item.content || '')
+                row.dataset.smsContent=encodeBase64(body || '')
+                const from = document.createElement('p'); from.textContent=String(item.number || '')
+                const content = document.createElement('p');content.textContent=body || ''
+                const date = document.createElement('p');date.textContent=String(item.date || '')
+                const remove=document.createElement('button'); remove.type='button';remove.textContent=t('delete')
+                let confirm=false;remove.onclick=async()=>{if(!confirm){confirm=true;remove.textContent=t('are_you_conform');setTimeout(()=>{confirm=false;remove.textContent=t('delete')},2000);return};const res=await removeSmsById(item.id);if(res.result==='success')handleSmsRender();else createToast(res.message||'删除失败','red')}
+                const read=document.createElement('button');read.type='button';read.textContent='标为已读';read.onclick=async()=>{const results=await readSmsByIds([item.id]);if(results.every(result=>result.success))handleSmsRender();else createToast('标记失败','red')}
+                row.append(from,content,date,read,remove);list.append(row)
             }
-            res = cachedSmsRes
-        }
-        if (res && (res.length > 0)) {
-            //防止重复渲染
-            let ids = res.map(item => item.id).join('')
-            if (ids === lastRequestSmsIds) return
-            lastRequestSmsIds = ids
-            const dateStrArr = [t('year'), t('month'), '&nbsp;', ':', ':', '']
-            res.sort((a, b) => {
-                let date_a = a.date.split(',')
-                let date_b = b.date.split(',')
-                date_a.pop()
-                date_b.pop()
-                return Number(date_b.join('')) - Number(date_a.join(''))
-            })
-            // 收集所有id，已读操作
-            const allIds = res?.filter(item => item.tag == '1')?.map(item => item.id)
-            if (allIds && allIds.length > 0) {
-                try {
-                    console.log(allIds, '批量已读短信');
-                    readSmsByIds(allIds)
-                } catch (error) {
-                    console.log('批量已读短信失败', error);
-                }
-            }
-            list.innerHTML = res.map(item => {
-                let date = item.date.split(',')
-                date.pop()
-                date = date.map((item, index) => {
-                    return item + dateStrArr[index]
-                }).join('')
-                return `<li class="sms-item" data-sms-id="${item.id}" data-sms-phone="${item.number}" data-sms-content="${item.content}" style="${item.tag == '3' ? 'background-color:#ffc0cb1f;margin-right:15px' : item.tag != '2' ? 'background-color:#0880001f;margin-left:15px' : 'background-color:#ffc0cb1f;margin-right:15px'}">
-                                        <div class="arrow" style="${item.tag == '3' ? 'right:-30px;border-color: transparent transparent transparent #ffc0cb1f' : item.tag == '2' ? 'right:-30px;border-color: transparent transparent transparent #ffc0cb1f' : 'left:-30px;border-color: transparent #0880001f transparent transparent'}"></div>
-                                        ${item.tag == "3" ? `<svg fill="var(--dark-text-color)" stroke="currentColor"  onclick="deleteAndReSendSms(${item.id})" class="icon" style="position: absolute;right: 50px;top: 18px;" width="14px" height="14px" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg">
-                <path d="M815.36 184.96V128a36.48 36.48 0 0 1 10.24-26.88 37.76 37.76 0 0 1 52.48 0 40.96 40.96 0 0 1 11.52 26.88v172.16a40.32 40.32 0 0 1-37.12 37.12h-173.44a40.32 40.32 0 0 1-26.88-11.52 37.76 37.76 0 0 1 0-52.48 35.84 35.84 0 0 1 26.88-10.24h108.8a372.48 372.48 0 0 0-453.12-75.52A367.36 367.36 0 0 0 170.24 364.8a374.4 374.4 0 0 0-19.84 242.56 369.92 369.92 0 0 0 132.48 202.24A375.04 375.04 0 0 0 512 888.32a368.64 368.64 0 0 0 263.68-108.8A376.32 376.32 0 0 0 885.12 512H960A448 448 0 1 1 136.32 270.08a438.4 438.4 0 0 1 192-164.48 444.16 444.16 0 0 1 256-32 455.68 455.68 0 0 1 230.4 111.36z"></path>
-            </svg>`: ""}
-                                        <div class="icon" onclick="deleteSMS(${item.id})">
-                                            <span id="message${item.id}" style="color: red;position: absolute;width: 100px;top: 2px;right: 30px;background: var(--dark-tag-color-active);display: none;text-align: center;padding: 4px;border-radius: 8px;backdrop-filter: blur(var(--blur-rate));">确定要删除吗？</span>
-                                            <svg fill="var(--dark-text-color)" stroke="currentColor"  xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" t="1742373390977" class="icon" viewBox="0 0 1024 1024" version="1.1" p-id="2837" width="16" height="16"><path d="M848 144H608V96a48 48 0 0 0-48-48h-96a48 48 0 0 0-48 48v48H176a48 48 0 0 0-48 48v48h768v-48a48 48 0 0 0-48-48zM176 928a48 48 0 0 0 48 48h576a48 48 0 0 0 48-48V288H176v640z m480-496a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z m-192 0a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z m-192 0a48 48 0 1 1 96 0v400a48 48 0 1 1-96 0V432z" p-id="2838"/></svg>
-                                        </div>
-                                        <p style="color:#adadad;font-size:16px;margin:4px 0">${item.number}${item.tag == '3' ? ` <span style="font-size:.7rem;color:red">(${t("toast_sms_send_failed")})</span>` : ""}</p>
-                                        <p>${decodeBase64(item.content)}</p>
-                                        <p style="text-align:right;color:#adadad;margin-top:4px">${date}</p>
-                                    </li > `
-            }).join('')
-        } else {
-            if (!res) {
-                return createToast(t('client_mgmt_fetch_error'), 'red')
-                // out()
-            }
-            list.innerHTML = ` <li> <h2 style="padding: 30px;text-align:center;">${t('no_sms')}</h2></li >`
-        }
-        isFirstRender = false
+            if(!messages.length)list.textContent=t('no_sms')
+            isFirstRender=false
+        } catch(e) {list.textContent=e.message || '无法读取短信'}
     }
 
     let cachedDiagImeiQueryResult = ''
     let diagImeiTimer = null
     const queryImeiFromDIAG = async () => {
-        if (diagImeiTimer == null) {
-            diagImeiTimer = setTimeout(() => {
-                cachedDiagImeiQueryResult = ''
-                diagImeiTimer = null
-            }, 5 * 60 * 1000);
-        }
-        if (cachedDiagImeiQueryResult && cachedDiagImeiQueryResult != '') {
-            return cachedDiagImeiQueryResult
-        }
-        let isEnabled = await checkAdvancedFunc()
-        if (isEnabled) {
-            try {
-                const res = await runShellWithRoot(`/data/data/com.minikano.f50_sms/files/imei_reader`)
-                const imei = res.content.replace(/IMEI[0-9]:/g, "").split('\n')[0]
-                cachedDiagImeiQueryResult = imei
-                return imei
-            } catch {
-                return ''
-            }
-        }
+        try { const response = await fetchWithTimeout(`${KANO_baseURL}/device/status`); const state = await response.json(); return state.data?.imei || '' } catch { return '' }
     }
 
     const resetDiagImeiCache = () => {
@@ -859,12 +700,13 @@ function main_func() {
     let handlerStatusRender = async (flag = false) => {
         const status = document.querySelector('#STATUS')
         if (flag) {
-            const TOKEN = localStorage.getItem('kano_sms_token')
+            const TOKEN = storedLoginToken()
             if (!TOKEN && isNeedToken) {
+                showModal('#tokenModal')
                 return false
             }
             KANO_TOKEN = TOKEN
-            common_headers.authorization = KANO_TOKEN
+            common_headers.authorization = TOKEN ? 'Bearer ' + TOKEN : ''
             status.innerHTML = `
         <li style="padding-top: 15px;">
             <strong class="green" style="margin: 10px auto;margin-top: 0; display: flex;flex-direction: column;padding: 40px;">
@@ -873,7 +715,20 @@ function main_func() {
             </strong>
         </li>`
         }
+        if (!(await initRequestData())) {
+            status.textContent = t('toast_login_to_get_data')
+            if (flag) showModal('#tokenModal')
+            return
+        }
         let res = await getUFIData()
+        if (res && res.__authInvalid) {
+            clearLoginToken()
+            KANO_TOKEN = null
+            common_headers.authorization = ''
+            out()
+            status.textContent = t('toast_login_expired')
+            return
+        }
         if (!res) {
             // out()
             if (flag) {
@@ -913,7 +768,7 @@ function main_func() {
                             isFirstRender = true
                             lastRequestSmsIds = null
                             localStorage.removeItem('kano_sms_pwd')
-                            localStorage.removeItem('kano_sms_token')
+                            clearLoginToken()
                             KANO_TOKEN = null
                             common_headers.authorization = null
                             initRenderMethod()
@@ -963,7 +818,7 @@ function main_func() {
                 const SINR = notNullOrundefinedOrIsShow(res, 'Nr_snr') ? res.Nr_snr : (notNullOrundefinedOrIsShow(res, 'Lte_snr') ? res.Lte_snr : '')
                 const RSRQ = notNullOrundefinedOrIsShow(res, 'nr_rsrq') ? res.nr_rsrq : (notNullOrundefinedOrIsShow(res, 'lte_rsrq') ? res.lte_rsrq : '')
 
-                if (!PCI || !FCN) {
+                if (PCI === '' || FCN === '') {
                     if (current_cell) {
                         current_cell.innerHTML = `<tr><td colspan="6" style="opacity:.66;text-align:center;color:var(--dark-text-color)">${t('no_cell_connected')}</td></tr>`
                     }
@@ -972,23 +827,23 @@ function main_func() {
                             createToast(t('no_cell_connected'), 'pink')
                         }
                     }
-                }
+                } else {
+                    if (select_current_cell_btn) {
+                        select_current_cell_btn.onclick = () => onSelectCellRow(PCI, FCN)
+                    }
 
-                if (select_current_cell_btn) {
-                    select_current_cell_btn.onclick = () => onSelectCellRow(PCI, FCN)
-                }
-
-                if (current_cell) {
-                    current_cell.innerHTML = `
+                    if (current_cell) {
+                        current_cell.innerHTML = `
             <tr onclick="onSelectCellRow(${PCI},${FCN})" style="cursor: pointer;">
                 <td>${BAND_STR}</td>
                 <td>${FCN}</td>
                 <td>${PCI}</td>
-                <td>${kano_parseSignalBar(RSRP)}</td>
-                <td>${kano_parseSignalBar(SINR, -10, 30, 13, 0)}</td>
-                <td>${kano_parseSignalBar(RSRQ, -20, -3, -9, -12)}</td>
+                <td>${RSRP === '' ? '—' : kano_parseSignalBar(RSRP)}</td>
+                <td>${SINR === '' ? '—' : kano_parseSignalBar(SINR, -10, 30, 13, 0)}</td>
+                <td>${RSRQ === '' ? '—' : kano_parseSignalBar(RSRQ, -20, -3, -9, -12)}</td>
             </tr>
             `
+                    }
                 }
             } catch (e) {
                 console.error("render PCI blocks fail:", e);
@@ -1008,12 +863,13 @@ function main_func() {
                 }
             } catch { }
 
+            const signalBars = getNetworkSignalBars(res)
             let statusHtml_base = {
                 QORS_MESSAGE: `${notNullOrundefinedOrIsShow(res, "QORS_MESSAGE") ? `<strong onclick="copyText(event)"  class="green">${QORS_MESSAGE}</strong>` : ''}`,
-                network_type: `${notNullOrundefinedOrIsShow(res, 'network_type') ? `<strong onclick="copyText(event)"  class="green">${t('network_status')}：${res.network_provider} ${res.network_type == '20' ? '5G' : res.network_type == '13' ? '4G' : res.network_type}</strong>` : ''}`,
+                network_type: `${notNullOrundefinedOrIsShow(res, 'network_type') ? `<strong onclick="copyText(event)"  class="green">${t('network_status')}：${res.network_provider || res.network_provider_fullname || ''} ${res.network_type == '20' ? '5G' : res.network_type == '13' ? '4G' : res.network_type}</strong>` : ''}`,
                 wifi_access_sta_num: `${notNullOrundefinedOrIsShow(res, 'wifi_access_sta_num') ? `<strong onclick="copyText(event)"  class="blue">${t('wifi_client_num')}：${res.wifi_access_sta_num}</strong>` : ''}`,
                 battery: `${notNullOrundefinedOrIsShow(res, 'battery') && (res.battery_value != '' || res.battery_vol_percent != '') ? `<strong onclick="copyText(event)"  class="green">${res.battery_charging == "1" ? `${t('charging')}` : `${t('battery_level')}`}：${kano_parseSignalBar(res.battery, 1, 100, 50, 10, undefined, " %")}</strong>` : ''}`,
-                rssi: `${notNullOrundefinedOrIsShow(res, 'rssi') || notNullOrundefinedOrIsShow(res, 'network_signalbar', true) ? `<strong onclick="copyText(event)"  class="green">${t('rssi')}：${kano_getSignalEmoji(notNullOrundefinedOrIsShow(res, 'rssi') ? res.rssi : res.network_signalbar)}</strong>` : ''}`,
+                rssi: `${signalBars !== null ? `<strong onclick="copyText(event)"  class="green">${t('rssi')}：${kano_getSignalEmoji(signalBars)}</strong>` : ''}`,
                 cpu_temp: `${notNullOrundefinedOrIsShow(res, 'cpu_temp') ? `<strong onclick="copyText(event)"  class="blue">${t('cpu_temp')}：<span style="text-align:center;display:inline-block;width: 8ch;">${String(Number(res.cpu_temp / 1000).toFixed(2)).padStart(5, ' ')} ℃</span></strong>` : ''}`,
                 cpu_usage: `${notNullOrundefinedOrIsShow(res, 'cpu_usage') ? `<strong onclick="copyText(event)"  class="blue">${t('cpu_usage')}：<span style="text-align:center;display:inline-block;width: 8ch;">${String(Number(res.cpu_usage).toFixed(2)).padStart(5, ' ')} %</span></strong>` : ''}`,
                 mem_usage: `${notNullOrundefinedOrIsShow(res, 'mem_usage') ? `<strong onclick="copyText(event)"  class="blue">${t("ram_usage")}：<span style="text-align:center;display:inline-block;width: 8ch;">${String(Number(res.mem_usage).toFixed(2)).padStart(5, ' ')} %</span></strong>` : ''}`,
@@ -1260,53 +1116,12 @@ function main_func() {
     clearBtn.onclick = async () => {
         isFirstRender = true
         lastRequestSmsIds = null
-        localStorage.removeItem('kano_sms_pwd')
-        localStorage.removeItem('kano_sms_token')
+        clearLoginToken()
         KANO_TOKEN = null
-        common_headers.authorization = null
+        common_headers.authorization = ''
+        const input = document.querySelector('#TOKEN')
+        if (input) input.value = ''
         initRenderMethod()
-        //退出登录请求
-        try {
-            login().finally(cookie => {
-                logout(cookie)
-            })
-        } catch { }
-        await needToken()
-        const label = document.querySelector("#token_div_label2")
-        const tokenEl = document.querySelector("#PWD_BLK")
-        const pwdEl = document.querySelector("#PWDINPUT")
-        const tokenInput = document.querySelector("#TOKEN")
-        label.style.display = ""
-        tokenEl.style.display = "flex"
-        //填充密码
-        if (CryptoJS) {
-            const str = localStorage.getItem('kano_remembered_loginfo')
-            if (str) {
-                try {
-                    const bytes = CryptoJS.AES.decrypt(str, 'kano_secret_key_1145141919810721')
-                    const originalText = bytes.toString(CryptoJS.enc.Utf8)
-                    const [remembered_password, remembered_token] = originalText.split('<kano_CryptoJS_split>')
-                    if (remembered_password && remembered_token) {
-                        pwdEl.value = remembered_password
-                        tokenInput.value = remembered_token
-                        const loginRememberMe = document.querySelector('#loginRememberMe')
-                        if (loginRememberMe) {
-                            loginRememberMe.checked = true
-                        }
-                    }
-                } catch (e) {
-                    console.error('Error decrypting remembered login info:', e)
-                }
-            }
-        }
-        if (pwdEl && pwdEl.value.trim() == "Wa@9w+YWRtaW4=") {
-            const loginMethodEl = document.querySelector("#login_method")
-            console.log("Admin login method detected, switch to password input")
-            if (loginMethodEl) {
-                loginMethodEl.value = "0"
-            }
-        }
-        createToast(t('toast_logout'), 'green')
         showModal('#tokenModal')
     }
 
@@ -1434,11 +1249,12 @@ function main_func() {
 
         selectEl.style.backgroundColor = ''
         selectEl.disabled = false
-        let { WiFiModuleSwitch, ResponseList } = await getData(new URLSearchParams({
+        let { WiFiModuleSwitch, BandSteeringSwitch, ResponseList } = await getData(new URLSearchParams({
             cmd: 'queryWiFiModuleSwitch,queryAccessPointInfo'
         }))
 
         const WIFIManagementContent = document.querySelector('#wifiInfo')
+        selectEl.querySelector('option[value="chip2"]').disabled = BandSteeringSwitch != '0'
 
         try {
             await initWIFIManagementForm()
@@ -1446,13 +1262,10 @@ function main_func() {
 
         if (WiFiModuleSwitch == "1") {
             WIFIManagementContent && (WIFIManagementContent.style.display = '')
-            if (ResponseList?.length) {
-                ResponseList.forEach(item => {
-                    if (item.AccessPointSwitchStatus == '1') {
-                        selectEl.value = item.ChipIndex == "0" ? 'chip1' : 'chip2'
-                    }
-                })
-            }
+            const enabled = (ResponseList || []).filter(item => item.AccessPointSwitchStatus == '1')
+            const has2g = enabled.some(item => item.ChipIndex == '0')
+            const has5g = enabled.some(item => item.ChipIndex == '1')
+            selectEl.value = has2g && has5g ? 'dual' : has2g ? 'chip1' : has5g ? 'chip2' : ''
         } else {
             WIFIManagementContent && (WIFIManagementContent.style.display = 'none')
             selectEl.value = 0
@@ -1479,10 +1292,10 @@ function main_func() {
                 return null
             }
             let res = null
-            if (value == "0" || value == 0) {
+            if (value == "0" || value == "1") {
                 res = await (await postData(cookie, {
                     goformId: 'switchWiFiModule',
-                    SwitchOption: 0
+                    SwitchOption: Number(value)
                 })).json()
             } else if (value == 'chip1' || value == 'chip2') {
                 res = await (await postData(cookie, {
@@ -1560,8 +1373,8 @@ function main_func() {
         let res = await getData(new URLSearchParams({
             cmd: 'roam_setting_option,dial_roam_setting_option'
         }))
-        if (res && res.dial_roam_setting_option) {
-            res.roam_setting_option = res.dial_roam_setting_option
+        if (res && res.dial_roam_setting_option != null) {
+            res.roam_setting_option = ["1","on",true,1].includes(res.dial_roam_setting_option) ? "on" : "off"
         }
         if (!el || !res || res.roam_setting_option == null || res.roam_setting_option == undefined) return
         el.onclick = async () => {
@@ -1577,7 +1390,6 @@ function main_func() {
                 }
                 let res1 = await (await postData(cookie, {
                     goformId: 'SET_CONNECTION_MODE',
-                    ConnectionMode: "auto_dial",
                     roam_setting_option: res.roam_setting_option == 'on' ? 'off' : 'on',
                     dial_roam_setting_option: res.roam_setting_option == 'on' ? 'off' : 'on'
                 })).json()
@@ -1713,29 +1525,9 @@ function main_func() {
                     nr_band_lock: nr_bands.join(',')
                 })).json(),
             ]))
-            if (res[0].result == 'success' || res[1].result == 'success') {
+            if (res.every(item => item.result === 'success')) {
                 createToast(t('toast_set_band_success'), 'green')
-                //重启网络栈
-                await networkStackSwitch(false)
-                await wait(300)
-                await networkStackSwitch(true)
-                // const netType = document.querySelector('#NET_TYPE')
-                // if (netType) {
-                //     const options = document.querySelectorAll('#NET_TYPE option')
-                //     const curValue = netType.value
-                //     //切到不同网络
-                //     if (options.length) {
-                //         const net = Array.from(options).find(el => el.value != curValue)
-                //         if (net) {
-                //             //切网
-                //             createToast(t("toast_changing"))
-                //             await changeNetwork({ target: { value: net.value } }, true)
-                //             await new Promise(resolve => setTimeout(resolve, 800))
-                //             //切回来
-                //             await changeNetwork({ target: { value: curValue } })
-                //         }
-                //     }
-                // }
+
             }
             else {
                 createToast(t('toast_set_band_failed'), 'red')
@@ -1874,7 +1666,9 @@ function main_func() {
             const form = {
                 pci: pciEl.value.trim(),
                 earfcn: earfcnEl.value.trim(),
-                rat: ratEl.value.trim()
+                rat: ratEl.value.trim(),
+                band: e.target.querySelector("#NR_LOCK_BAND").value,
+                scs: e.target.querySelector("#NR_LOCK_SCS").value
             }
 
             if (!form.pci || !form.earfcn) {
@@ -2071,78 +1865,12 @@ function main_func() {
     })
 
     //流量管理逻辑
-    document.querySelector("#DataManagement").onclick = () => {
-        (async () => {
-            if (!(await initRequestData())) {
-                createToast(t('toast_please_login'), 'red')
-                out()
-                return null
-            }
-            // 查流量使用情况
-            let res = await getDataUsage()
-            if (!res) {
-                createToast(t('toast_get_data_usage_failed'), 'red')
-                return null
-            }
-
-            res = {
-                ...res,
-                "wan_auto_clear_flow_data_switch": isNullOrUndefiend(res.wan_auto_clear_flow_data_switch) ? res.wan_auto_clear_flow_data_switch : res.flux_auto_clear_flow_data_switch,
-                "data_volume_limit_unit": isNullOrUndefiend(res.data_volume_limit_unit) ? res.data_volume_limit_unit : res.flux_data_volume_limit_unit,
-                "data_volume_limit_size": isNullOrUndefiend(res.data_volume_limit_size) ? res.data_volume_limit_size : res.flux_data_volume_limit_size,
-                "traffic_clear_date": isNullOrUndefiend(res.traffic_clear_date) ? res.traffic_clear_date : res.flux_clear_date,
-                "data_volume_alert_percent": isNullOrUndefiend(res.data_volume_alert_percent) ? res.data_volume_alert_percent : res.flux_data_volume_alert_percent,
-                "data_volume_limit_switch": isNullOrUndefiend(res.data_volume_limit_switch) ? res.data_volume_limit_switch : res.flux_data_volume_limit_switch,
-            }
-
-            // 预填充表单
-            const form = document.querySelector('#DataManagementForm')
-            if (!form) return null
-            let data_volume_limit_switch = form.querySelector('input[name="data_volume_limit_switch"]')
-            let wan_auto_clear_flow_data_switch = form.querySelector('input[name="wan_auto_clear_flow_data_switch"]')
-            let data_volume_limit_unit = form.querySelector('input[name="data_volume_limit_unit"]')
-            let traffic_clear_date = form.querySelector('input[name="traffic_clear_date"]')
-            let data_volume_alert_percent = form.querySelector('input[name="data_volume_alert_percent"]')
-            let data_volume_limit_size = form.querySelector('input[name="data_volume_limit_size"]')
-            let data_volume_limit_type = form.querySelector('select[name="data_volume_limit_type"]')
-            let data_volume_used_size = form.querySelector('input[name="data_volume_used_size"]')
-            let data_volume_used_type = form.querySelector('select[name="data_volume_used_type"]')
-
-            // (12094630728720/1024/1024)/1048576
-            let used_size_type = 1
-            const used_size = (() => {
-                const total_bytes = ((Number(res.monthly_rx_bytes) + Number(res.monthly_tx_bytes))) / Math.pow(1024, 2)
-
-                if (total_bytes < 1024) {
-                    return total_bytes.toFixed(2)
-                } else if (total_bytes >= 1024 && total_bytes < Math.pow(1024, 2)) {
-                    used_size_type = 1024
-                    return (total_bytes / 1024).toFixed(2)
-                } else {
-                    used_size_type = Math.pow(1024, 2)
-                    return (total_bytes / Math.pow(1024, 2)).toFixed(2)
-                }
-            })()
-
-            data_volume_limit_switch && (data_volume_limit_switch.checked = res.data_volume_limit_switch.toString() == '1')
-            wan_auto_clear_flow_data_switch && (wan_auto_clear_flow_data_switch.checked = res.wan_auto_clear_flow_data_switch.toString() == 'on')
-            data_volume_limit_unit && (data_volume_limit_unit.checked = res.data_volume_limit_unit.toString() == 'data')
-            traffic_clear_date && (traffic_clear_date.value = res.traffic_clear_date.toString())
-            data_volume_alert_percent && (data_volume_alert_percent.value = res.data_volume_alert_percent.toString())
-            data_volume_limit_size && (data_volume_limit_size.value = res.data_volume_limit_size?.split('_')[0].toString())
-            data_volume_limit_type && (() => {
-                const val = Number(res.data_volume_limit_size?.split('_')[1])
-                const option = data_volume_limit_type.querySelector(`option[data-value="${val}"]`)
-                option && (option.selected = true)
-            })()
-            data_volume_used_size && (data_volume_used_size.value = used_size.toString())
-            data_volume_used_type && (() => {
-                const option = data_volume_used_type.querySelector(`option[data-value="${used_size_type.toFixed(0)}"]`)
-                option && (option.selected = true)
-            })()
-            showModal('#DataManagementModal')
-        })()
-        initUfiDataManagementModal();
+    document.querySelector("#DataManagement").onclick = async () => {
+        if (!(await initRequestData())) { out(); return }
+        switchDataMgrMethod('ufi')
+        const official=document.querySelector('#officialDataManagementTabBtn');if(official)official.hidden=true
+        await initUfiDataManagementModal()
+        showModal('#DataManagementModal')
     }
 
     //流量管理表单提交
@@ -2246,7 +1974,7 @@ function main_func() {
                         break;
                 }
             }
-            form_data['data_volume_limit_size'] = form_data['data_volume_limit_size'] + form_data['data_volume_limit_type']
+            form_data['data_volume_limit_size'] = (Number(form_data['data_volume_limit_size'])*Number(form_data['data_volume_limit_type'])*2**20).toFixed(0)
             form_data['flux_data_volume_limit_size'] = form_data['data_volume_limit_size']
             const used_data = Number(form_data.data_volume_used_size) * Number(form_data['data_volume_used_type']) * Math.pow(1024, 2)
             const clear_form_data = {
@@ -2293,67 +2021,29 @@ function main_func() {
     //WIFI管理逻辑
     let initWIFIManagementForm = async () => {
         try {
-            let { WiFiModuleSwitch, ResponseList } = await getData(new URLSearchParams({
-                cmd: 'queryWiFiModuleSwitch,queryAccessPointInfo'
-            }))
-
-            const WIFIManagementForm = document.querySelector('#WIFIManagementForm')
-            const WIFIManagementContent = document.querySelector('#wifiInfo')
-            if (!WIFIManagementForm) return
-
-            if (WiFiModuleSwitch == "1" && ResponseList?.length) {
-                WIFIManagementContent && (WIFIManagementContent.style.display = '')
-                for (let index in ResponseList) {
-                    if (ResponseList[index].AccessPointSwitchStatus == '1') {
-                        let item = ResponseList[index]
-                        let apEl = WIFIManagementForm.querySelector('input[name="AccessPointIndex"]')
-                        let chipEl = WIFIManagementForm.querySelector('input[name="ChipIndex"]')
-                        let ApMaxStationNumberEl = WIFIManagementForm.querySelector('input[name="ApMaxStationNumber"]')
-                        let PasswordEl = WIFIManagementForm.querySelector('input[name="Password"]')
-                        let ApBroadcastDisabledEl = WIFIManagementForm.querySelector('input[name="ApBroadcastDisabled"]')
-                        let SSIDEl = WIFIManagementForm.querySelector('input[name="SSID"]')
-                        let QRCodeImg = document.querySelector("#QRCodeImg")
-                        let AuthModeEl = WIFIManagementForm.querySelector('select[name="AuthMode"]')
-                        apEl && (apEl.value = item.AccessPointIndex)
-                        chipEl && (chipEl.value = item.ChipIndex)
-                        ApMaxStationNumberEl && (ApMaxStationNumberEl.value = item.ApMaxStationNumber)
-                        PasswordEl && (PasswordEl.value = decodeBase64(item.Password))
-                        ApBroadcastDisabledEl && (ApBroadcastDisabledEl.checked = item.ApBroadcastDisabled.toString() == '0')
-                        SSIDEl && (SSIDEl.value = item.SSID)
-                        // 二维码
-                        fetch(KANO_baseURL + item.QrImageUrl, {
-                            headers: common_headers
-                        }).then(async (res) => {
-                            const blob = await res.blob();
-                            const objectURL = URL.createObjectURL(blob);
-                            QRCodeImg.onload = () => {
-                                URL.revokeObjectURL(objectURL);
-                            };
-                            QRCodeImg.src = objectURL;
-                        });
-                        const WIFI_FORM_SHOWABLE = document.querySelector('#WIFI_FORM_SHOWABLE')
-                        AuthModeEl.value = item.AuthMode
-                        AuthModeEl.selected = item.AuthMode
-                        if (AuthModeEl && WIFI_FORM_SHOWABLE) {
-                            const option = AuthModeEl.querySelector(`option[data-value="${item.AuthMode}"]`)
-                            option && (option.selected = "selected")
-                            if (item.AuthMode == "OPEN") {
-                                WIFI_FORM_SHOWABLE.style.display = 'none'
-                            } else {
-                                WIFI_FORM_SHOWABLE.style.display = ''
-                            }
-                        }
-
-                    }
-                }
-            } else {
-                WIFIManagementContent && (WIFIManagementContent.style.display = 'none')
+            const { WiFiModuleSwitch, ResponseList = [] } = await getData(new URLSearchParams({cmd: 'queryWiFiModuleSwitch,queryAccessPointInfo'}))
+            const form = document.querySelector('#WIFIManagementForm')
+            const selector = document.querySelector('#WIFI_EDIT_BAND')
+            const selected = selector.value
+            selector.replaceChildren(...ResponseList.map(item => new Option(item.ChipIndex == 1 ? '5 GHz' : '2.4 GHz', item.AccessPointIndex)))
+            if (ResponseList.some(item => String(item.AccessPointIndex) === selected)) selector.value = selected
+            const render = () => {
+                const item = ResponseList.find(item => String(item.AccessPointIndex) === selector.value)
+                document.querySelector('#wifiInfo').style.display = item ? '' : 'none'
+                if (!item) return
+                for (const key of ['AccessPointIndex', 'ChipIndex', 'ApMaxStationNumber', 'SSID', 'ApIsolate']) form.elements[key].value = item[key] ?? ''
+                form.elements.ApMaxStationNumber.placeholder = '留空保留当前设置'
+                form.elements.Password.value = ''
+                form.elements.Password.placeholder = item.PasswordSet ? '留空保留当前密码' : '请输入新密码'
+                form.elements.ApBroadcastDisabled.checked = String(item.ApBroadcastDisabled) === '0'
+                form.elements.AuthMode.value = item.AuthMode
+                handleWifiEncodeChange({target: form.elements.AuthMode})
+                // Existing passphrases are never returned to the browser.
+                document.querySelector('#QRCodeImg').hidden = true
             }
-        }
-        catch (e) {
-            console.error(e.message)
-            // createToast(e.message)
-        }
+            selector.onchange = render
+            render()
+        } catch (e) { createToast(e.message, 'red') }
     }
 
     document.querySelector("#WIFIManagement").onclick = async () => {
@@ -2407,31 +2097,27 @@ function main_func() {
                         data[key] = value == 'on' ? 0 : 1
                         break;
                     case 'Password':
-                        // if(!value.trim()) createToast('请输入密码！')
-                        value.trim() && (data[key] = encodeBase64(value.trim()))
+                        if (value) data[key] = encodeBase64(value)
+                        break;
+                    case 'AccessPointIndex':
+                        data[key] = value; break;
+                    case 'ApMaxStationNumber':
+                        if (value.trim() !== '') data[key] = Number(value.trim())
                         break;
                     case 'ApIsolate':
-                    case 'ApMaxStationNumber':
-                    case 'AccessPointIndex':
                     case 'ChipIndex':
                         !isNaN(Number(value.trim())) && (data[key] = Number(value.trim()))
                         break;
                 }
             }
 
-            if (data.AuthMode == 'OPEN' || data.EncrypType == "NONE") {
-                delete data.Password
-            } else {
-                if (data.Password.length == 0) {
-                    return createToast(t('toast_please_input_pwd'), 'red')
-                }
-                if (data.Password.length < 8) {
-                    return createToast(t('toast_password_too_short'), 'red')
-                }
-                if (data.ApMaxStationNumber.length <= 0) {
-                    return createToast(t('toast_max_client_must_greater_than_0'), 'red')
-                }
+            const rawPassword = formData.get('Password') || ''
+            if (data.AuthMode === 'OPEN') delete data.Password
+            else if (rawPassword && (new TextEncoder().encode(rawPassword).length < 8 || new TextEncoder().encode(rawPassword).length > 63)) {
+                return createToast('密码需要 8–63 字节，留空保留当前密码', 'red')
             }
+            if (data.ApMaxStationNumber === '') delete data.ApMaxStationNumber
+            else if (!Number.isInteger(data.ApMaxStationNumber) || data.ApMaxStationNumber < 1 || data.ApMaxStationNumber > 128) return createToast(t('toast_max_client_must_greater_than_0'), 'red')
 
             const res = await (await postData(cookie, {
                 goformId: 'setAccessPointInfo',
@@ -2474,18 +2160,7 @@ function main_func() {
         }
     }
 
-    document.querySelector('#PWDINPUT').addEventListener('keydown', (event) => {
-        console.log(1, event);
-        if (event.key === 'Enter') {
-            onTokenConfirm()
-        }
-    });
-    document.querySelector('#TOKEN').addEventListener('keydown', (event) => {
-        console.log(2, event);
-        if (event.key === 'Enter') {
-            onTokenConfirm()
-        }
-    });
+    // The candidate login form handles Enter through its submit event.
 
     //无线设备管理
     document.querySelector('#ClientManagement').onclick = async () => {
@@ -2500,112 +2175,35 @@ function main_func() {
 
     let initClientManagementModal = async () => {
         try {
-            const { station_list, lan_station_list, BlackMacList, BlackNameList, AclMode, devices } = await getData(new URLSearchParams({
-                cmd: 'station_list,lan_station_list,queryDeviceAccessControlList,hostNameList'
-            }))
-            const blackMacList = BlackMacList ? BlackMacList.split(';') : []
-            const blackNameList = BlackNameList ? BlackNameList.split(';') : []
-
-            const CONN_CLIENT_LIST = document.querySelector('#CONN_CLIENT_LIST')
-            const BLACK_CLIENT_LIST = document.querySelector('#BLACK_CLIENT_LIST')
-
-            let conn_client_html = ''
-            let black_list_html = ''
-
-            if (station_list && station_list.length) {
-                conn_client_html += station_list.map(({ hostname, ip_addr, mac_addr }) => {
-                    let hostname_show = hostname
-                    if (devices) {
-                        hostname_show = devices.find(i => i.mac == mac_addr)?.hostname || hostname
-                    }
-                    return `
-            <div class="card-item" style="display: flex;width: 100%;margin: 10px 0;overflow: auto;">
-                <div style="margin-right: 10px;">
-                    <p>
-                        <span>${t('client_mgmt_hostname')}：</span><span onclick="copyText(event)">${hostname_show}</span>
-                        <svg onclick="editHostName('${hostname_show}','${mac_addr}')" class="svg-icon" style="margin-left:10px" fill="var(--dark-text-color)" stroke="currentColor" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width=".8rem" height=".8rem"><path d="M568.888889 28.444444v113.777778H142.222222v739.555556h739.555556V455.111111h113.777778v455.111111a85.333333 85.333333 0 0 1-85.333334 85.333334H113.777778A85.333333 85.333333 0 0 1 28.444444 910.222222V113.777778A85.333333 85.333333 0 0 1 113.777778 28.444444h455.111111z" p-id="5380"></path><path d="M881.777778 398.222222m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5381"></path><path d="M475.192889 656.327111l-102.286222-4.209778-5.973334-103.537777 346.851556-347.591112a11.377778 11.377778 0 0 1 16.099555-0.056888l92.16 91.591111a11.377778 11.377778 0 0 1 0 16.156444l-346.851555 347.591111zM876.202667 238.762667l-92.16-91.648a11.377778 11.377778 0 0 1 0-16.156445L879.104 36.408889a11.377778 11.377778 0 0 1 16.042667 0l92.16 91.704889a11.377778 11.377778 0 0 1 0 16.099555l-95.004445 94.549334a11.377778 11.377778 0 0 1-16.099555 0z" p-id="5382"></path><path d="M512 28.444444m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5383"></path></svg>
-                    </p>
-                    <p><span>${t('client_mgmt_mac')}：</span><span onclick="copyText(event)">${mac_addr}</span></p>
-                    <p><span>${t('client_mgmt_ip')}：</span><span onclick="copyText(event)">${ip_addr}</span></p>
-                    <p><span>${t('client_mgmt_conn_type')}：</span><span>${t('client_mgmt_conn_wireless')}</span></p>
-                </div>
-                <div style="flex:1;text-align: right;">
-                    <button class="btn" style="padding: 20px 4px;" 
-                        onclick="setOrRemoveDeviceFromBlackList('${[mac_addr, ...blackMacList].join(';')}','${[hostname, ...blackNameList].join(';')}','${AclMode}')">
-                        🚫 ${t('client_mgmt_block')}
-                    </button>
-                </div>
-            </div>`}).join('')
+            const data = await getData(new URLSearchParams({cmd:'station_list,lan_station_list,queryDeviceAccessControlList,hostNameList'}))
+            const macs = (data.BlackMacList || '').split(';').filter(Boolean).map(v => v.toUpperCase())
+            const names = (data.BlackNameList || '').split(';')
+            const connected = document.querySelector('#CONN_CLIENT_LIST'), blocked = document.querySelector('#BLACK_CLIENT_LIST')
+            connected.replaceChildren(); blocked.replaceChildren()
+            const card = (parent, name, mac, ip, action, handler) => {
+                const row = document.createElement('div'); row.className = 'card-item'; row.style.margin = '10px 0'
+                const label = document.createElement('p'); label.textContent = `${name || t('client_mgmt_unknown')} · ${mac}${ip ? ' · ' + ip : ''}`
+                const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = t('client_mgmt_hostname'); edit.onclick = () => editHostName(name || '', mac)
+                const button = document.createElement('button'); button.type = 'button'; button.textContent = action; button.onclick = handler
+                row.append(label, edit, button); parent.append(row)
             }
-
-            if (lan_station_list && lan_station_list.length) {
-                conn_client_html += lan_station_list.map(({ hostname, ip_addr, mac_addr }) => {
-                    let hostname_show = hostname
-                    if (devices) {
-                        hostname_show = devices.find(i => i.mac == mac_addr)?.hostname || hostname
-                    }
-                    return `
-            <div class="card-item" style="display: flex;width: 100%;margin: 10px 0;overflow: auto;">
-                <div style="margin-right: 10px;">
-                    <p>
-                        <span>${t('client_mgmt_hostname')}：</span><span onclick="copyText(event)">${hostname_show}</span>
-                        <svg onclick="editHostName('${hostname_show}','${mac_addr}')" class="svg-icon" style="margin-left:10px" fill="var(--dark-text-color)" stroke="currentColor" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width=".8rem" height=".8rem"><path d="M568.888889 28.444444v113.777778H142.222222v739.555556h739.555556V455.111111h113.777778v455.111111a85.333333 85.333333 0 0 1-85.333334 85.333334H113.777778A85.333333 85.333333 0 0 1 28.444444 910.222222V113.777778A85.333333 85.333333 0 0 1 113.777778 28.444444h455.111111z" p-id="5380"></path><path d="M881.777778 398.222222m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5381"></path><path d="M475.192889 656.327111l-102.286222-4.209778-5.973334-103.537777 346.851556-347.591112a11.377778 11.377778 0 0 1 16.099555-0.056888l92.16 91.591111a11.377778 11.377778 0 0 1 0 16.156444l-346.851555 347.591111zM876.202667 238.762667l-92.16-91.648a11.377778 11.377778 0 0 1 0-16.156445L879.104 36.408889a11.377778 11.377778 0 0 1 16.042667 0l92.16 91.704889a11.377778 11.377778 0 0 1 0 16.099555l-95.004445 94.549334a11.377778 11.377778 0 0 1-16.099555 0z" p-id="5382"></path><path d="M512 28.444444m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5383"></path></svg>
-                    </p>
-                    <p><span>${t('client_mgmt_mac')}：</span><span onclick="copyText(event)">${mac_addr}</span></p>
-                    <p><span>${t('client_mgmt_ip')}：</span><span onclick="copyText(event)">${ip_addr}</span></p>
-                    <p><span>${t('client_mgmt_conn_type')}：</span><span>${t('client_mgmt_conn_wired')}</span></p>
-                </div>
-                <div style="flex:1;text-align: right;">
-                    <button class="btn" style="padding: 20px 4px;" 
-                        onclick="setOrRemoveDeviceFromBlackList('${[mac_addr, ...blackMacList].join(';')}','${[hostname, ...blackNameList].join(';')}','${AclMode}')">
-                        🚫 ${t('client_mgmt_block')}
-                    </button>
-                </div>
-            </div>`}).join('')
+            for (const item of [...(data.station_list || []), ...(data.lan_station_list || [])]) {
+                const mac = String(item.mac_addr || '').toUpperCase()
+                if (!mac || macs.includes(mac)) continue
+                card(connected, item.hostname, mac, item.ip_addr, '禁止上网', () => setOrRemoveDeviceFromBlackList([...macs,mac].join(';'), [...names,item.hostname || ''].join(';'), '1'))
             }
-
-            if (blackMacList.length && blackNameList.length) {
-                black_list_html += blackMacList.map((item, index) => {
-                    if (item) {
-                        let params = `'${blackMacList.filter(i => item != i).join(';')}',` +
-                            `'${blackMacList.filter(i => blackNameList[index] != i).join(';')}',` +
-                            `'${AclMode}'`
-                        return `
-                    <div class="card-item" style="display: flex;width: 100%;margin: 10px 0;overflow: auto;">
-                        <div style="margin-right: 10px;">
-                            <p>
-                                <span>${t('client_mgmt_hostname')}：</span><span onclick="copyText(event)">${blackNameList[index] ? blackNameList[index] : t('client_mgmt_unknown')}</span>
-                                <svg onclick="editHostName('${blackNameList[index] || ''}','${item}')" class="svg-icon" style="margin-left:10px" fill="var(--dark-text-color)" stroke="currentColor" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width=".8rem" height=".8rem"><path d="M568.888889 28.444444v113.777778H142.222222v739.555556h739.555556V455.111111h113.777778v455.111111a85.333333 85.333333 0 0 1-85.333334 85.333334H113.777778A85.333333 85.333333 0 0 1 28.444444 910.222222V113.777778A85.333333 85.333333 0 0 1 113.777778 28.444444h455.111111z" p-id="5380"></path><path d="M881.777778 398.222222m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5381"></path><path d="M475.192889 656.327111l-102.286222-4.209778-5.973334-103.537777 346.851556-347.591112a11.377778 11.377778 0 0 1 16.099555-0.056888l92.16 91.591111a11.377778 11.377778 0 0 1 0 16.156444l-346.851555 347.591111zM876.202667 238.762667l-92.16-91.648a11.377778 11.377778 0 0 1 0-16.156445L879.104 36.408889a11.377778 11.377778 0 0 1 16.042667 0l92.16 91.704889a11.377778 11.377778 0 0 1 0 16.099555l-95.004445 94.549334a11.377778 11.377778 0 0 1-16.099555 0z" p-id="5382"></path><path d="M512 28.444444m11.377778 0l91.022222 0q11.377778 0 11.377778 11.377778l0 91.022222q0 11.377778-11.377778 11.377778l-91.022222 0q-11.377778 0-11.377778-11.377778l0-91.022222q0-11.377778 11.377778-11.377778Z" p-id="5383"></path></svg>
-                            </p>
-                            <p><span>${t('client_mgmt_mac')}：</span><span onclick="copyText(event)">${item}</span></p>
-                        </div>
-                        <div style="flex:1;text-align: right;">
-                            <button class="btn" style="padding: 20px 4px;" onclick="setOrRemoveDeviceFromBlackList(${params})">
-                                ✅ ${t('client_mgmt_unblock')}
-                            </button>
-                        </div>
-                    </div>`
-                    }
-                }).join('')
-            }
-
-            if (conn_client_html == '') conn_client_html = `<p>${t('client_mgmt_no_device')}</p>`
-            if (black_list_html == '') black_list_html = `<p>${t('client_mgmt_no_device')}</p>`
-
-            CONN_CLIENT_LIST && (CONN_CLIENT_LIST.innerHTML = conn_client_html)
-            BLACK_CLIENT_LIST && (BLACK_CLIENT_LIST.innerHTML = black_list_html)
-        } catch (e) {
-            console.error(e)
-            createToast(t('client_mgmt_fetch_error'), 'red')
-        }
+            macs.forEach((mac, i) => card(blocked, names[i], mac, '', '恢复上网', () => setOrRemoveDeviceFromBlackList(macs.filter((_,j) => i !== j).join(';'), names.filter((_,j) => i !== j).join(';'), '1')))
+            if (!connected.children.length) connected.textContent = t('client_mgmt_no_device')
+            if (!blocked.children.length) blocked.textContent = t('client_mgmt_no_device')
+        } catch (e) { createToast(e.message || t('client_mgmt_fetch_error'), 'red') }
     }
 
     const editHostName = async (name, mac) => {
         const { el, close } = createFixedToast('kano_edit_hostname', `
                 <div style="pointer-events:all;width:80vw;max-width:300px;">
                 <div class="title" style="margin:0" data-i18n="please_input_hostname">${t('please_input_hostname')}</div>
-                <input class="user_select_none" type="text" style="border: none;padding:6px;width:100%;margin-top:10px" disabled value="MAC: ${mac}"></input>
-                <input type="text" id="KANO_CONN_HOSTNAME" style="padding:6px;width:100%;margin:10px 0" data-i18n-placeholder="hostname" placeholder="${t("hostname")}" value="${name}"></input>
+                <input class="user_select_none" type="text" style="border: none;padding:6px;width:100%;margin-top:10px" disabled value=""></input>
+                <input type="text" id="KANO_CONN_HOSTNAME" style="padding:6px;width:100%;margin:10px 0" data-i18n-placeholder="hostname" placeholder="${t("hostname")}" value=""></input>
                 <div style="display:flex;gap:10px">
                     <button id="close_kano_edit_hostname_toast_btn" style="width:100%;font-size:.64rem;margin-top:5px" data-i18n="confirm_btn">${t("confirm_btn")}</button>
                     <button id="close_kano_edit_hostname_toast_btn1" style="width:100%;font-size:.64rem;margin-top:5px" data-i18n="cancel_btn">${t("cancel_btn")}</button>
@@ -2615,6 +2213,8 @@ function main_func() {
         const btn = el.querySelector('#close_kano_edit_hostname_toast_btn')
         const btn2 = el.querySelector('#close_kano_edit_hostname_toast_btn1')
         const hostname = el.querySelector("#KANO_CONN_HOSTNAME")
+        if (hostname) hostname.value = name
+        const macField = el.querySelector("input[disabled]"); if (macField) macField.value = `MAC: ${mac}`
 
         if (!btn && !btn2 && !hostname) {
             close()
@@ -3034,38 +2634,14 @@ function main_func() {
 
     // 启用TTYD（如果有）
     let initTTYD = async () => {
-        const TTYD = document.querySelector('#TTYD')
-        if (!TTYD) return
-        const list = TTYD.querySelector('.deviceList')
-        if (!list) return
-        //fetch TTYD地址，如有，则显示
-        try {
-            const port = localStorage.getItem('ttyd_port')
-            if (!port) return
-            const TTYD_INPUT = document.querySelector('#TTYD_INPUT')
-            TTYD_INPUT && (TTYD_INPUT.value = port)
-            const res = await (await fetch(`${KANO_baseURL}/hasTTYD?port=${port}`, {
-                method: "get",
-                headers: common_headers
-            })).json()
-            if (res.code !== '200') {
-                TTYD.style.display = 'none'
-                list.innerHTML = ``
-                return
-            }
-            console.log('TTYD found')
-            TTYD.style.display = ''
-            setTimeout(() => {
-                const title = TTYD.querySelector('.title strong')
-                title && (title.innerHTML = "TTYD")
-                list.innerHTML = `
-        <li style = "padding:10px">
-                    <iframe src="http://${res.ip}" style="border:none;padding:0;margin:0;width:100%;height:400px;border-radius: 10px;overflow: hidden;opacity: .6;"></iframe>
-        </li > `
-            }, 600);
-        } catch {
-            // console.log();
-        }
+        const panel=document.querySelector('#TTYD'); const list=panel?.querySelector('ul');if(!panel||!list)return
+        panel.style.display='';list.replaceChildren()
+        const start=document.createElement('button');start.type='button';start.textContent='启动候选终端'
+        const stop=document.createElement('button');stop.type='button';stop.textContent='停止终端'
+        const status=document.createElement('p')
+        start.onclick=async()=>{try{let res=await fetchWithTimeout(`${KANO_baseURL}/ttyd/start`,{method:'POST'});if(!res.ok)throw new Error((await res.json()).message||'终端启动失败');res=await fetchWithTimeout(`${KANO_baseURL}/terminal/session`,{method:'POST'});const session=await res.json();if(!res.ok)throw new Error(session.message||'终端认证失败');list.querySelector('iframe')?.remove();const frame=document.createElement('iframe');frame.src=session.data.url;frame.style.cssText='border:0;width:100%;height:400px';list.append(frame);status.textContent='终端已启动'}catch(e){status.textContent=e.message}}
+        stop.onclick=async()=>{const res=await fetchWithTimeout(`${KANO_baseURL}/ttyd/stop`,{method:'POST'});if(res.ok){list.querySelector('iframe')?.remove();status.textContent='终端已停止'}else status.textContent='停止失败'}
+        list.append(start,stop,status)
     }
     initTTYD()
 
@@ -3105,7 +2681,6 @@ function main_func() {
         const RES_SERVER_INPUT = document.querySelector('#RES_SERVER_INPUT')
         if (!RES_SERVER_INPUT) return
         const url = RES_SERVER_INPUT.value.trim()
-        if (!url || url.length == 0) return createToast("Please input res server!", 'red')
         const res = await (await fetchWithTimeout(`${KANO_baseURL}/set_res_server`, {
             method: 'POST',
             headers: common_headers,
@@ -3610,7 +3185,7 @@ function main_func() {
         const formData = new FormData(form);
         const newToken = formData.get('newToken')
         const confirmToken = formData.get('confirmToken')
-        const exp = /^(?=.*[a-zA-Z])(?=.*\d).{8,128}$/
+        const exp = /^[\x21-\x7e]{8,256}$/
         if (!newToken || newToken.trim() == '') return createToast(t('toast_please_input_new_token'), 'red')
         if (!confirmToken || confirmToken.trim() == '') return createToast(t('toast_please_input_new_conform_token'), 'red')
         if (newToken != confirmToken) return createToast(t('toast_token_not_eqal'), 'red')
@@ -3627,28 +3202,13 @@ function main_func() {
                 })).json()
                 if (res && res.result == 'success') {
                     createToast(t('toast_change_success'), 'green')
-                    const new_token = SHA256(newToken.trim()).toLowerCase()
+                    const new_token = newToken.trim()
+                    const remember = !!localStorage.getItem('ufi_remembered_token')
+                    storeLoginToken(new_token, remember)
                     KANO_TOKEN = new_token
-                    common_headers.authorization = KANO_TOKEN
-                    localStorage.setItem('kano_sms_token', new_token)
+                    common_headers.authorization = 'Bearer ' + new_token
                     form.reset()
-                    const md = createModal({
-                        name: "kano_token_confirm",
-                        noBlur: true,
-                        isMask: true,
-                        title: t('remind_your_token'),
-                        contentStyle: "font-size:12px",
-                        onClose: () => {
-                            return true
-                        },
-                        onConfirm: () => {
-                            return true
-                        },
-                        content: `<div><p class="title" style="margin:6px 0">${t('remind_your_token_text')}</p><h1 onclick="copyText(event)" style="text-align:center">${newToken}</h1></div>`
-                    })
-                    closeModal('#changeTokenModal', 300, () => {
-                        showModal(md.id)
-                    })
+                    closeModal('#changeTokenModal')
                 } else {
                     throw t('toast_change_failed')
                 }
@@ -3670,7 +3230,10 @@ function main_func() {
     //sim卡切换
     let initSimCardType = async () => {
         let selectEl = document.querySelector('#SIM_CARD_TYPE')
-        const { model } = await (await fetch(`${KANO_baseURL}/version_info`, { headers: common_headers })).json()
+        const versionResponse = await fetch(`${KANO_baseURL}/version_info`, { headers: common_headers })
+        if (!versionResponse.ok) return
+        const { model } = await versionResponse.json()
+        if (typeof model !== 'string') return
         if (model.toLowerCase() == 'v50') {
             selectEl = document.querySelector('#SIM_CARD_TYPE_V50')
         }
@@ -4582,7 +4145,7 @@ function main_func() {
                 })
             })).json()
             if (res.result == 'success') {
-                createToast(t('toast_smtp_test_mail'), 'green')
+                createToast('SMTP 配置已保存', 'green')
                 // form.reset()
                 // closeModal('#smsForwardModal')
             } else {
@@ -4620,7 +4183,7 @@ function main_func() {
                 })
             })).json()
             if (res.result == 'success') {
-                createToast(t('toast_curl_test_msg'), 'green')
+                createToast('HTTP 转发配置已保存', 'green')
                 // form.reset()
                 // closeModal('#smsForwardModal')
             } else {
@@ -5070,13 +4633,13 @@ function main_func() {
             })).json()
 
             if (res.result == 'success') {
-                createToast(t('toast_set_success_reboot'), 'green')
+                createToast(t('toast_set_success'), 'green')
                 closeModal('#LANManagementModal')
-                setTimeout(() => {
-                    //循环等待
-                    let newURL = 'http://' + data.lanIp + ':2333'
-                    window.location.href = newURL
-                }, 30000);
+                if (res.requires_reconnect && !res.simulated && data.lanIp !== location.hostname) {
+                    createToast('LAN 地址已修改，请重新连接设备后打开新地址', 'green')
+                    const target = new URL(location.href); target.hostname = data.lanIp
+                    setTimeout(() => { location.href = target.href }, 30000)
+                }
             } else {
                 throw t('toast_set_failed')
             }
@@ -5129,19 +4692,19 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
     //定时任务管理
     const clearAddTaskForm = () => {
         const form = document.querySelector('#AddTaskForm')
-        form.id.value = '' // 清空ID
-        form.id.disabled = false // 允许修改 ID
+        form.elements.namedItem("id").value = '' // 清空ID
+        form.elements.namedItem("id").disabled = false // 允许修改 ID
         form.date_time.value = '' // 清空时间
         form.repeatDaily.checked = false // 清空复选框
-        form.action.value = '' // 清空动作参数
+        form.elements.namedItem("action").value = '' // 清空动作参数
     }
     const setAddTaskForm = (task) => {
         const form = document.querySelector('#AddTaskForm')
-        form.id.value = task.id
-        form.id.disabled = true
-        form.date_time.value = task.time
-        form.repeatDaily.checked = task.repeatDaily
-        form.action.value = JSON.stringify(task.actionMap || {}, null, 2)
+        form.elements.namedItem("id").value = task.id
+        form.elements.namedItem("id").disabled = true
+        form.date_time.value = new Date(task.next_unix*1000 - new Date(task.next_unix*1000).getTimezoneOffset()*60000).toISOString().slice(0,16)
+        form.repeatDaily.checked = task.interval_seconds === 86400
+        form.elements.namedItem("action").value = JSON.stringify(task.action?.params || (task.action?.type === "forward_status" ? {kano_do_sms_forward_action:"1"} : {}), null, 2)
     }
 
     const initScheduledTask = async () => {
@@ -5160,76 +4723,13 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
     initScheduledTask()
 
     function appendTaskToList(task) {
-        const SCHEDULED_TASK_LIST = document.querySelector('#SCHEDULED_TASK_LIST')
-        const li = document.createElement('li')
-        li.style.marginBottom = '10px'
-        li.style.padding = '0 10px'
-        li.style.boxSizing = 'border-box'
-        li.style.width = '100%'
-        li.style.overflow = 'hidden'
-
-        li.innerHTML = `
-    <div style="background: none;display: flex;width: 100%;margin-top: 10px;overflow: auto;" class="card-item">
-      <div style="flex:1;margin-right: 10px;">
-        <p><span>${t('task_name_label')}</span><span>${task.id}</span></p>
-        <p><span>${t('trigger_time_label')}</span><span>${task.time}</span></p>
-        <p><span>${t('last_exe')}</span><span>${task.lastRunTimestamp ? (new Date(task.lastRunTimestamp).toLocaleString('zh-cn').replaceAll('/', '-')) : t('not_exec')}${task.hasTriggered ? `（${t('exec_ed')}）` : ""}</span></p>
-        <p><span>${t('repeat_daily_label')}</span><span>${task.repeatDaily ? t('yes') : t('no')}</span></p>
-        <p><span>${t('action_param')}:</span></p>
-        <p class="text_Area"></p>
-      </div>
-    </div>
-    <div style="padding-bottom:10px;text-align: right;">
-      <button class="btn editBtn" style="margin: 2px;padding: 4px 6px;" onclick="editTask('${task.id}')">${t('edit')}</button>
-      <button class="btn deleteBtn" style="margin: 2px;padding: 4px 6px;">${t('delete')}</button>
-    </div>
-  `
-
-        const textarea = document.createElement('textarea')
-        textarea.disabled = true
-        textarea.style.width = '100%'
-        textarea.style.fontSize = '12px'
-        textarea.style.padding = '6px'
-        textarea.rows = 6
-        textarea.value = JSON.stringify(task.actionMap || {}, null, 2)
-        li.querySelector('.text_Area').appendChild(textarea)
-
-        let timer = null
-        let counter = 0
-        // 删除功能
-        li.querySelector('.deleteBtn').onclick = async () => {
-            timer && clearTimeout(timer)
-            timer = setTimeout(() => {
-                li.querySelector('.deleteBtn').innerHTML = t('delete')
-                counter = 0
-            }, 1000)
-            li.querySelector('.deleteBtn').innerHTML = t('are_you_conform')
-            counter += 1
-            if (counter >= 2) {
-                try {
-                    const res = await fetchWithTimeout(`${KANO_baseURL}/remove_task`, {
-                        method: 'POST',
-                        headers: {
-                            ...common_headers,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ id: task.id })
-                    })
-                    const json = await res.json()
-                    if (json.result === 'removed') {
-                        createToast(t('toast_delete_success'), 'green')
-                        handleInitialScheduledTasks()
-                    } else {
-                        createToast(t('toast_delete_failed'), 'red')
-                    }
-                } catch (e) {
-                    console.error(e)
-                    createToast(t('toast_opration_failed_network'), 'red')
-                }
-            }
-        }
-
-        SCHEDULED_TASK_LIST.appendChild(li)
+        const li = document.createElement('li'); li.className = 'card-item'; li.style.cssText = 'padding:12px;display:block;width:100%;box-sizing:border-box'
+        const summary = document.createElement('p'); summary.textContent = `${task.id} · ${new Date(task.next_unix*1000).toLocaleString()} · ${task.enabled ? '已启用' : '已停止'} · ${({running:'执行中',success:'成功',failed:'失败'})[task.status] || '等待执行'}`
+        const details = document.createElement('pre'); details.textContent = task.last_error || JSON.stringify(task.action, null, 2)
+        const edit = document.createElement('button'); edit.type='button'; edit.textContent=t('edit'); edit.onclick=()=>editTask(task.id)
+        const toggle=document.createElement('button'); toggle.type='button'; toggle.textContent=task.enabled?'停止':'启用';toggle.onclick=async()=>{const data={...task,enabled:!task.enabled,status:''};const res=await fetchWithTimeout(`${KANO_baseURL}/scheduler`,{method:'POST',body:JSON.stringify({id:task.id,data})});if(res.ok)handleInitialScheduledTasks();else createToast('保存任务失败','red')}
+        const remove=document.createElement('button');remove.type='button';remove.textContent=t('delete');remove.onclick=async()=>{const res=await fetchWithTimeout(`${KANO_baseURL}/scheduler/${encodeURIComponent(task.id)}`,{method:'DELETE'});if(res.ok)handleInitialScheduledTasks();else createToast('删除任务失败','red')}
+        summary.style.cssText='margin-bottom:8px;overflow-wrap:anywhere';details.style.cssText='white-space:pre-wrap;overflow:auto;max-height:180px;font-size:12px;margin-bottom:10px';const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;justify-content:flex-end';for(const button of [edit,toggle,remove]){button.style.cssText='min-width:64px;padding:6px 10px';actions.append(button)};li.append(summary,details,actions);document.querySelector('#SCHEDULED_TASK_LIST').append(li)
     }
 
     const handleInitialScheduledTasks = async () => {
@@ -5245,15 +4745,16 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                 method: 'GET',
                 headers: common_headers
             })).json()
-            if (res && res.tasks && res.tasks.length > 0) {
+            if (res.code === 0 && res.data?.length > 0) {
                 SCHEDULED_TASK_LIST.innerHTML = ''
                 //倒转
-                res.tasks.reverse().forEach((task) => {
-                    appendTaskToList(task)
+                res.data.reverse().forEach((task) => {
+                    appendTaskToList({id:task.id,...JSON.parse(task.data)})
                 })
             } else {
                 SCHEDULED_TASK_LIST.innerHTML = `<li style="padding:10px">${t('no_scheduled_tasks')}</li>`
             }
+            if (res.active === false) { const note=document.createElement('li');note.textContent='调度器未启用，任务当前仅保存';SCHEDULED_TASK_LIST.prepend(note) }
         }
         catch (e) {
             console.error(e)
@@ -5268,15 +4769,15 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
         e.preventDefault()
         const form = e.target
         const data = {
-            id: form.id.value.trim(),
+            id: form.elements.namedItem("id").value.trim(),
             time: form.date_time.value.trim(),
             repeatDaily: form.repeatDaily.checked,
             action: {}
         }
 
         try {
-            data.action = form.action.value.trim()
-                ? JSON.parse(form.action.value.trim())
+            data.action = form.elements.namedItem("action").value.trim()
+                ? JSON.parse(form.elements.namedItem("action").value.trim())
                 : {}
         } catch (e) {
             return createToast(t('toast_is_not_valid_json'), 'red')
@@ -5289,22 +4790,22 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                     ...common_headers,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify({id:data.id,data:{enabled:true,next_unix:Math.floor(new Date(data.time).getTime()/1000),interval_seconds:data.repeatDaily?86400:0,action:data.action.kano_do_sms_forward_action?{type:'forward_status'}:{type:'goform_command',params:Object.fromEntries(Object.entries(data.action).map(([k,v])=>[k,String(v)]))}}})
             })
 
             const json = await res.json()
-            if (json.result === 'success') {
-                createToast(t('toast_save_success'), 'green')
+            if (res.ok && json.code === 0) {
+                createToast(json.data?.active ? t('toast_save_success') : '任务已保存，调度器尚未启用', json.data?.active ? 'green' : 'pink')
                 closeModal('#AddTaskModal', 300, () => {
                     showModal("#ScheduledTasksModal")
                 })
                 handleInitialScheduledTasks()
 
                 //清除字段
-                form.id.value = ''
+                form.elements.namedItem("id").value = ''
                 form.date_time.value = ''
                 form.repeatDaily.checked = false
-                form.action.value = ''
+                form.elements.namedItem("action").value = ''
             } else {
                 createToast(t('toast_add_failed'), 'red')
             }
@@ -5327,7 +4828,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
         closeModal("#ScheduledTasksModal", 300, async () => {
             clearAddTaskForm()
             const form = document.querySelector('#AddTaskForm')
-            form.id.value = id
+            form.elements.namedItem("id").value = id
             //拿取最新数据
             try {
                 const res = await fetchWithTimeout(`${KANO_baseURL}/get_task?id=${id}`, {
@@ -5338,8 +4839,8 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
                 })
                 const json = await res.json()
                 //预填充表单
-                setAddTaskForm(json)
-                form.id.disabled = true // 禁止修改 ID
+                setAddTaskForm({...JSON.parse(json.data.data),id:json.data.id})
+                form.elements.namedItem("id").disabled = true // 禁止修改 ID
                 setTimeout(() => {
                     showModal('#AddTaskModal')
                 }, 100);
@@ -6683,7 +6184,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
             }
         }
     }
-    initTerms()
+    // Upstream agreement remains available as a notice, not an automatic login gate.
 
     const initCheckWeakToken = async () => {
         if (!(await initRequestData())) {
@@ -6988,17 +6489,17 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
         const target = document.querySelector("#SLEEP_TIME")
         if (!target) return
         if (!(await initRequestData())) {
-            target.disabed = true
+            target.disabled = true
             target.style.background = "var(--dark-btn-disabled-color)"
             return null
         }
-        target.disabed = false
+        target.disabled = false
         target.style.background = ""
         // 从设备获取数据
         const { sleep_sysIdleTimeToSleep } = await getData(new URLSearchParams({
             cmd: "sleep_sysIdleTimeToSleep"
         }))
-        if (sleep_sysIdleTimeToSleep == "") {
+        if (sleep_sysIdleTimeToSleep == null || sleep_sysIdleTimeToSleep === "") {
             target.style.display = 'none'
         } else {
             target.style.display = ''
@@ -7202,271 +6703,79 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
 
     // APN设置
     const initAPNManagement = async () => {
-        const btn = document.querySelector('#APNManagement')
+        const button = document.querySelector('#APNManagement')
         if (!(await initRequestData())) {
-            btn.onclick = () => createToast(t('toast_please_login'), 'red')
-            btn.style.background = "var(--dark-btn-disabled-color)"
-            return null
+            button.onclick = () => createToast(t('toast_please_login'), 'red')
+            return
         }
-        btn.style.background = ""
-        const renderData = async () => {
-            showModal('#APNManagementModal')
-            // 加载数据
-            const res = await getAPNData()
-
-            const APNManagementFormEl = document.querySelector('#APNManagementForm')
-            const APNManagementForm = document.querySelector('#APNManagementForm .content')
-            if (!APNManagementForm) return
-
-            const autoProfileEl = APNManagementForm.querySelector('#autoProfileEl')
-            const profileEl = APNManagementForm.querySelector('#profileEl')
-            if (autoProfileEl && profileEl) {
-                if (res.apn_mode == "auto") {
-                    autoProfileEl.style.display = ""
-                    profileEl.style.display = "none"
-                } else {
-                    autoProfileEl.style.display = "none"
-                    profileEl.style.display = ""
-                }
-            }
-
-            const currentAPNEl = APNManagementForm.querySelector('span[name="apn_wan_apn"]')
-            if (currentAPNEl) currentAPNEl.textContent = res.apn_wan_apn + ` (${res.profile_name || res.m_profile_name || res.profile_name_ui})`
-
-            const autoApnModeEl = APNManagementForm.querySelector('#autoAPNMode')
-            const apnModeEl = APNManagementForm.querySelector('#apnMode')
-            if (apnModeEl) {
-                if (res.apn_mode == "auto") {
-                    autoApnModeEl.checked = true
-                } else {
-                    apnModeEl.checked = true
-                }
-            }
-
-            const autoProfile = APNManagementForm.querySelector('#autoProfile')
-            if (autoProfile) {
+        button.style.background = ''
+        const modal = document.querySelector('#APNManagementModal')
+        const form = modal.querySelector('#candidate-apn-editor')
+        const select = modal.querySelector('#apn-profile')
+        const mode = modal.querySelector('#apn-mode')
+        const message = modal.querySelector('#apn-message')
+        let state = null, editingId = ''
+        const api = async (method, path, body) => {
+            const response = await fetchWithTimeout(KANO_baseURL + path, {method, headers: {'Content-Type':'application/json'}, ...(body ? {body:JSON.stringify(body)} : {})})
+            const data = await response.json()
+            if (!response.ok || data.code) throw new Error(data.message || 'APN 操作失败')
+            return data.data
+        }
+        const load = async () => {
+            message.textContent = '正在读取 APN…'
+            state = await api('GET', '/apn/all')
+            select.replaceChildren()
+            for (const profile of state.manual) {
                 const option = document.createElement('option')
-                option.value = res.apn_auto_profile
-                option.textContent = res.apn_m_profile_name || res.m_profile_name || res.profile_name
-                autoProfile.innerHTML = res.apn_m_profile_name || res.m_profile_name || res.profile_name
-                autoProfile.appendChild(option)
+                option.value = profile.profileId
+                option.textContent = profile.profile_name + ' — ' + profile.apn_wan_apn
+                select.appendChild(option)
             }
-
-            //手动配置文件下拉列表渲染
-            const profile = APNManagementForm.querySelector('select[name="profile"]')
-
-            if (profile) {
-                let selectedIndex = -1
-                profile.selectedIndex =
-                    profile.innerHTML = ''
-                for (let i = 0; i < 20; i++) {
-                    if (!res["APN_config" + i]) continue
-                    const configs = res["APN_config" + i].split('($)')
-                    const configs_v6 = res["ipv6_APN_config" + i]
-                    if (configs && configs.length) {
-                        const option = document.createElement('option')
-                        option.value = configs[0] //第一个值为APN名称
-                        option.textContent = configs[0]
-                        profile.appendChild(option)
-                        // 选择当前使用的配置
-                        if (configs[0] == (res.m_profile_name || res.profile_name)) {
-                            selectedIndex = i
-                        }
-                    }
-                }
-                if (selectedIndex == -1) {
-                    selectedIndex = profile.querySelectorAll('option').length - 1
-                }
-                profile.selectedIndex = selectedIndex
-            }
-
-            //渲染APN列表（预览）
-            renderAPNViewModalContet(res)
-
-            //保存profile
-            const onSaveProfile = (method = "add") => {
-                return async (e) => {
-                    e.preventDefault()
-                    if (!(await initRequestData())) {
-                        createToast(t("toast_need_login"), 'red');
-                        return false;
-                    }
-
-                    const manualProfileEl = APNManagementForm.querySelector('#manualProfile')
-
-                    let index = manualProfileEl.selectedIndex
-
-                    // 如果是添加配置的话，index应该是列表总数(+1)
-                    if (method == "add") {
-                        const options = APNManagementForm.querySelectorAll('#manualProfile option')
-                        if (options.length) {
-                            index = options.length
-                        }
-                    }
-
-                    const formData = getAPNEditFormData({ index })
-
-                    if (!formData) {
-                        createToast(t("please_input_full_profile"), 'red')
-                        return
-                    }
-
-                    try {
-                        const res = await saveAPNProfile(formData)
-                        if (res.result == "success") {
-                            createToast(t('toast_save_success'), 'green')
-                            closeModal('#APNEditModal', 300, () => {
-                                showModal('#APNManagementModal')
-                                // 重新加载
-                                renderData()
-                            })
-                        } else {
-                            createToast(t('toast_save_failed'), 'red')
-                        }
-                    } catch (e) {
-                        createToast(t('toast_save_failed'), 'red')
-                    }
-                }
-            }
-
-            // 手动模式
-            // 绑定添加的事件
-            const addAPNBtn = APNManagementForm.querySelector('#addAPNProfile')
-            if (addAPNBtn) addAPNBtn.onclick = async (e) => {
-                e.preventDefault()
-                const title = document.querySelector('#APNEditModal #APN_MOD_TITLE')
-                if (title) title.textContent = t("add_apn")
-                if (!(await initRequestData())) {
-                    createToast(t("toast_need_login"), 'red');
-                    return false;
-                }
-                closeModal('#APNManagementModal', 300, () => {
-                    showModal('#APNEditModal')
-                    //异步加载数据
-                    renderAPNEditModalContet({
-                        profile_name: "",
-                        apn_wan_apn: "",
-                        apn_ppp_username: "",
-                        apn_ppp_passwd: "",
-                        apn_ppp_auth_mode: "none",
-                        apn_pdp_type: "IP",
-                    })
-                    // 保存
-                    const submitBtn = document.querySelector('#APNEditModal button[name="submit"]')
-                    if (submitBtn && APNManagementFormEl) {
-                        submitBtn.onclick = onSaveProfile("add")
-                    }
-                })
-            }
-
-            // 绑定编辑的事件
-            const editAPNBtn = APNManagementForm.querySelector('#editAPNProfile')
-            if (editAPNBtn) editAPNBtn.onclick = async (e) => {
-                e.preventDefault()
-                const title = document.querySelector('#APNEditModal #APN_MOD_TITLE')
-                if (title) title.textContent = t("edit_apn")
-                if (!(await initRequestData())) {
-                    createToast(t("toast_need_login"), 'red');
-                    return false;
-                }
-                closeModal('#APNManagementModal', 300, () => {
-                    showModal('#APNEditModal')
-                    // 获取当前选中的配置文件index
-                    const profileEl = APNManagementForm.querySelector('#profileEl select[name="profile"]')
-                    if (profileEl) {
-                        const index = profileEl.selectedIndex
-                        const config = res["APN_config" + index].split('($)')
-                        const config_v6 = res["ipv6_APN_config" + index].split('($)')
-                        console.log(config, config_v6);
-                        renderAPNEditModalContet({
-                            profile_name: config[0] || "",
-                            apn_wan_apn: config[1] || "",
-                            apn_ppp_username: config[5] || "",
-                            apn_ppp_passwd: config[6] || "",
-                            apn_ppp_auth_mode: config[4] || "",
-                            apn_pdp_type: config[7] || "",
-                        })
-                    }
-                    // 保存
-                    const submitBtn = document.querySelector('#APNEditModal button[name="submit"]')
-                    if (submitBtn && APNManagementFormEl) {
-                        submitBtn.onclick = onSaveProfile("mod")
-                    }
-
-                })
-            }
-
-            // 绑定删除的事件
-            const delAPNBtn = APNManagementForm.querySelector('#delAPNProfile')
-            if (delAPNBtn) delAPNBtn.onclick = async (e) => {
-                e.preventDefault()
-                if (!(await initRequestData())) {
-                    createToast(t("toast_need_login"), 'red');
-                    return false;
-                }
-                // 获取当前选中的配置文件index
-                const profileEl = APNManagementForm.querySelector('#profileEl select[name="profile"]')
-                if (profileEl) {
-                    const index = profileEl.selectedIndex
-                    try {
-                        const res = await deleteAPNProfile(index)
-                        if (res && res.result == "success") {
-                            createToast(t('toast_delete_success'), 'green')
-                            // 重新加载
-                            renderData()
-                        } else {
-                            createToast(t('toast_delete_failed'), 'red')
-                        }
-                    } catch (e) {
-                        createToast(t('toast_delete_failed'), 'red')
-                    }
-                }
-            }
-
-            //绑定切换自动手动事件
-            const submitBtn = APNManagementFormEl.querySelector('button[name="submit"]')
-            if (submitBtn && APNManagementFormEl) {
-                submitBtn.onclick = async (e) => {
-                    e.preventDefault()
-                    if (!(await initRequestData())) {
-                        createToast(t("toast_need_login"), 'red');
-                        return false;
-                    }
-                    const autoAPNModeEl = APNManagementForm.querySelector('#autoAPNMode')
-                    const apnModeEl = APNManagementForm.querySelector('#apnMode')
-                    let apn_mode = "manual"
-                    let profile_name = ""
-                    let index = 0
-                    if (autoAPNModeEl.checked) {
-                        apn_mode = "auto"
-                    } else if (apnModeEl.checked) {
-                        apn_mode = "manual"
-                        const manualProfile = APNManagementForm.querySelector('#manualProfile')
-                        if (manualProfile) {
-                            profile_name = manualProfile.value
-                            index = manualProfile.selectedIndex
-                        }
-                    }
-
-                    if (apn_mode == "manual" && !profile_name) {
-                        return createToast(t('please_select_apn_profile'), 'red')
-                    }
-
-                    try {
-                        const res = await switchAPNAuto({ isAuto: apn_mode == "auto", index })
-                        if (res.result == "success") {
-                            createToast(t('toast_oprate_success'), 'green')
-                            renderData()
-                        } else {
-                            createToast(t('toast_oprate_failed'), 'red')
-                        }
-                    } catch (e) {
-                        createToast(t('toast_oprate_failed'), 'red')
-                    }
-                }
-            }
+            if (state.enabled_id) select.value = state.enabled_id
+            mode.value = state.mode
+            message.textContent = state.manual.length ? '已读取设备配置。模式变更可能需要重新连接。' : '没有手动配置，可新增或使用自动模式。'
         }
-        btn.onclick = renderData
+        const action = operation => async event => {
+            event?.preventDefault()
+            try { await operation(); } catch (error) { message.textContent = error.message; createToast(error.message, 'red') }
+        }
+        button.onclick = action(async () => {showModal('#APNManagementModal'); form.style.display='none'; await load()})
+        const edit = profile => {
+            editingId = profile?.profileId || ''
+            form.reset()
+            for (const name of ['profile_name','apn_wan_apn','apn_pdp_type','apn_ppp_auth_mode']) {
+                if (profile?.[name] !== undefined) form.elements[name].value = String(profile[name])
+            }
+            form.style.display = 'flex'
+        }
+        modal.querySelector('#apn-add').onclick = () => edit(null)
+        modal.querySelector('#apn-edit').onclick = () => {
+            const profile=state?.manual.find(item=>item.profileId===select.value)
+            if(profile) edit(profile)
+            else message.textContent='请先选择配置'
+        }
+        modal.querySelector('#apn-cancel-edit').onclick = () => {form.reset();form.style.display='none'}
+        modal.querySelector('#apn-delete').onclick = action(async () => {
+            if (!select.value) throw new Error('请先选择配置')
+            if (!window.confirm('删除选中的 APN 配置？')) return
+            await api('DELETE','/apn/manual/'+encodeURIComponent(select.value))
+            await load()
+        })
+        modal.querySelector('#apn-apply-mode').onclick = action(async () => {
+            if (mode.value==='manual'&&!select.value) throw new Error('手动模式需要选择配置')
+            await api('POST','/apn/mode',{mode:mode.value,profileId:select.value})
+            await load()
+            createToast('APN 模式已应用','green')
+        })
+        form.onsubmit = action(async () => {
+            const data=Object.fromEntries(new FormData(form).entries())
+            data.apn_pdp_type=Number(data.apn_pdp_type)
+            data.apn_ppp_auth_mode=Number(data.apn_ppp_auth_mode)
+            await api(editingId?'PUT':'POST','/apn/manual'+(editingId?'/'+encodeURIComponent(editingId):''),data)
+            form.reset();form.style.display='none'
+            await load()
+            createToast('APN 配置已保存','green')
+        })
     }
     initAPNManagement()
 
@@ -7485,24 +6794,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
     }
 
     const fetchUSBStatusList = async (el) => {
-        try {
-            const res = await (await fetchWithTimeout(`${KANO_baseURL}/usb_status`, {
-                method: "GET",
-                headers: common_headers
-            })).json()
-            if (!res) { throw new Error('No data') }
-            let isGadgetMode = res.details.typec_mode == "gadget"
-            el.innerHTML = `<div style="display: flex;margin-bottom:10px;flex-direction:column"><div>${t('max_speed')}：${isGadgetMode ? res.details.gadget_speed : formatSpeed(res.maxSpeed)}</div><div>${t('usb_status')}：${res.details.typec_mode}/${!isGadgetMode ? t('host_usb_exp') : t('device_usb_exp')}</div></div>
-            <ul class="deviceList" style="display: flex;flex-direction: column;gap: 10px;">
-                ${res.details.devices.map(device => `<li style="padding: 10px;">
-                            <div>${t('path')}：${device.path}</div>
-                            <div>${t('device_name')}： ${device.product}</div>
-                            <div>${t('speed')}：${formatSpeed(device.speed)}</div>
-                        </li>`).join('')}
-            </ul>`.trim()
-        } catch {
-            el.innerHTML = `<div style="text-align:center;padding:20px 0">${t('no_usb_list')}</div>`
-        }
+        try {const response=await fetchWithTimeout(`${KANO_baseURL}/usb_status`);const result=await response.json();if(!response.ok)throw new Error(result.message||result.error||'USB 状态不可用');const pre=document.createElement('pre');pre.textContent=result.data?.available?JSON.stringify(result.data,null,2):'当前后端没有 USB 硬件状态';el.replaceChildren(pre)}catch(error){el.textContent=error.message}
     }
 
     //usb管理
@@ -7665,24 +6957,11 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
         md.id && showModal(md.id)
     }
 
-    //免密码登录
     const noPassLogin = () => {
-        const method = "0"
-        const password = "Wa@9w+YWRtaW4="
-
-        //下面不用改
-        const loginMethodEl = document.querySelector("#login_method")
-        const label = document.querySelector("#token_div_label2")
-        const tokenEl = document.querySelector("#PWD_BLK")
-        const pwdEl = document.querySelector("#PWDINPUT")
-        loginMethodEl.value = method
-        pwdEl.value = password
-        label.style.display = "none"
-        tokenEl.style.display = "none"
-        createToast(t('toast_no_pass_login_fill_success'), 'green')
+        document.querySelector('#TOKEN')?.focus()
+        createToast('请输入本程序安装时生成的口令', 'pink')
     }
 
-    //切换密码显示
     const switchPassInputShow = (e, id) => {
         e.preventDefault()
         const target = e.currentTarget
@@ -8165,6 +7444,7 @@ echo ${flag ? '1' : '0'} > /sys/devices/system/cpu/cpu3/online
     // initSimCardPin()
     //挂载方法到window
     const methods = {
+ closeSmsList,
         exportPlugin,
         handleUFIDataManagementFormSubmit,
         switchDataMgrMethodTab,

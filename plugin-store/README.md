@@ -54,3 +54,20 @@ The report records each detected format, HTTP(S) URL, hostname, local API path,
 and high-risk construction such as shell APIs, dynamic evaluation, recursive
 deletion, or command-line downloads. Findings are review prompts rather than a
 claim that a plugin is malicious or safe.
+
+## Installing into the candidate web UI
+
+Both `POST /api/store/plugins/{id}/install` and the `/api/plugin/install` aliases
+verify the configured catalog download, save source/metadata and activate its
+marked fragment in `custom_head` in one transaction. Reload the page to run it.
+Reinstallation updates the same fragment in place and preserves an existing
+disabled choice; hand-written fragments and ordering remain intact.
+
+`GET /api/plugin/list` reports `enabled` for the web fragment; it does not report
+a device daemon's running state. `POST /api/plugin/uninstall` removes only that
+fragment and its stored record. Component services, files and startup commands
+remain under the component manager's explicit controls; removing a web plugin
+does not silently stop or delete shared device programs.
+
+The selected U60 screen manager's local activation, process and cleanup checks
+are described in the [lifecycle report](../research/stage5-plugin-lifecycle-20261023/REPORT.md).

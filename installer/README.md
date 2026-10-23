@@ -1,80 +1,107 @@
-# Installer
+# U60 Pro 脚本安装器
 
-Both installation transports consume the same release bundle and transaction:
+当前第二阶段维护ADB与LAN脚本。本文描述ADB；[LAN说明](lan-backup/README.md)提供备份、离线准备、首装、卸载和反向恢复。LAN使用原厂恢复并重启，不能套用ADB的无重启假设。Windows、Android图形安装器仍不作为交付要求。
 
-1. preflight architecture, free space, permissions, and current service;
-2. verify the release manifest, Ed25519 signature, digest, and artifact size;
-3. stage into `/data/ufi-tools.next` without overwriting the active version;
-4. stop the existing service and atomically rotate active/backup directories;
-5. install the service entry and start the candidate;
-6. check `http://127.0.0.1:2333/healthz`;
-7. restore the backup if any step or the health check fails.
+## 安装边界
 
-`install-adb.sh` is the preferred authorized-ADB transport. It defaults to a
-dry run and does not contact a device unless `--execute` is passed. The LAN
-transport has the same dry-run default and implements the official multipart
-upload and UBUS restore calls, restart-aware health checking, a mandatory
-matching rollback container, and health-verified automatic rollback. Its
-encryption and archive format have been calibrated against an authorized
-real-device backup. CLI, Windows, and Android installers implement the official
-salted router-password login and authenticated `webtoken` upload flow;
-destructive restore acceptance is intentionally deferred. Rollback support
-reduces installation risk but cannot guarantee recovery from power loss,
-firmware-specific restore side effects, or a device that no longer boots.
-When the router password is supplied, the shared installer client keeps it only
-in process memory and re-authenticates before a rollback upload because Web/UBUS
-sessions may be invalidated by reboot. A manually supplied UBUS session cannot
-be renewed automatically and may therefore be unsuitable for recovery testing.
+- 默认安装目录：`/data/ufi-tools-re`；网页端口：`2433`。
+- 原版 `/data/ufi-tools` 和 `2333` 端口保持原样。脚本拒绝将原版目录或其子目录当作安装/上传目标。
+- 不接管 `/sdcard`，不执行插件开机脚本，不修改 hosts、USB、ADB 配置、系统网络或原版数据库。
+- 候选根目录、数据目录和启动文件备份目录使用私有权限；上传暂存以私有 umask 创建，并拒绝暂存目录／归属文件／控制器软链接。
+- 初始启动禁用后台写任务、AT 和固定特权操作，避免安装时执行设备变更；后续用户主动通过功能接口修改设备属于功能验收范围，安装器不能自动还原任意用户操作。
+- 自启仅添加本工具的一行。保存修改前后内容及原链接信息；卸载时若没有后续修改则精确恢复，若用户已编辑则只移除本工具添加的行。写入使用同目录临时文件和原子替换；符号链接保持原样，目标文件模式保留，硬链接启动文件拒绝自动修改。
+- 只停止可确认属于本安装目录的进程。无效或复用到其他进程的 PID 不会被终止。
 
-Build and preview the LAN transport with:
+“不影响原系统”的当前可测试范围是上述安装/卸载副作用边界。离线验证已覆盖模拟原系统文件、独立进程和挂载表；真实设备的 ADB 独立安装／升级／默认卸载／恢复／回退已经验证；真实整机开机自启与 LAN 恢复仍未验证。
 
-```sh
-go run ./cmd/install-lan --base http://192.168.98.1 \
-  --container build/backup_restore.bin \
-  --rollback-container build/closed-rollback.bin
+## 功能运行开关
+
+新安装的设备后端为 `u60-local`，直接使用设备本地 UBUS，不需要原厂网页登录密码；已有 `.ufi-runtime` 中显式配置的 `u60-ubus`／`zte-http` 后端和地址会保留。
+
+服务的 `.ufi-runtime` 是普通键值文件。需要人工启用功能时，修改相应行后再重启候选服务：
+
+```ini
+WORKERS_ENABLED=true
+PRIVILEGED_COMPAT=true
+AT_ENABLED=true
 ```
 
-## Graphical installers
+三项分别控制后台调度／统计／转发、设备写入及固定特权操作、AT 辅助程序。初始均为 `false`；只启用需要且已确认依赖的项。该文件不能放 Shell 命令；服务按数据读取，不执行文件内容。首次安装时显式传入的同名 `UFI_...` 环境设置也会保存，启动时环境值优先。开启开关不会安装缺失的辅助工具；执行失败会返回错误或保存在后台状态中。
 
-`cmd/installer-ui` is the source of the Windows graphical installer. It binds
-only to a random loopback port, opens the system browser, requires a random
-per-process CSRF token, rejects public device targets, and uses the same
-transactional LAN client. Build the PE32+ GUI executable with:
+首次候选口令在启动时生成；可由用户在网页中改为 8—256 位可见 ASCII 字符（无空格），也可手动设置成与原厂页相同的密码。候选不读取原厂密码，也不自动同步后续改密；首页与后台共用候选登录。首页的“候选系统管理”提供日志、文件、Hosts 和后台设置；流量按 UTC 从首次采样起累计，详见 [主计划](../PLAN.md)。
 
-```sh
-make build-installers
-```
+## 准备本地安装包
 
-The native Android project is under `installer/android`. It supports
-document selection, preview mode, explicit restore confirmation, app-private
-rollback-container storage, restart-aware health checks, and verified rollback. Build it
-with JDK 17 and Android SDK 35 using `./gradlew :app:assembleDebug` from that
-directory. Signing and distribution are release concerns and are not performed
-by these commands.
-
-The signing private key is never stored in this repository or release bundle.
-
-Generate a release keypair once with `go run ./cmd/release-keygen`, move the
-private key to offline secret storage, and build a verified bundle with:
+需要 Go 1.26.10、POSIX shell；电脑传输需要已授权且具有 root shell 的 ADB。不会自动开启调试或变更系统权限。
 
 ```sh
-VERSION=0.1.0 PRIVATE_KEY=/secure/private.hex PUBLIC_KEY=release-public-key.hex \
-  ./scripts/make-release.sh
+./scripts/package-script.sh
 ```
 
-`installer/test-transaction.sh` exercises the atomic swap and failure rollback
-entirely under a temporary directory with fake health and verifier commands.
-
-The ARM64 AT helper and self-hosted plugin-store service/catalog are included
-in the standard bundle. Optional open-source `ttyd` and speed-test binaries can be included without
-vendoring them in this repository:
+输出默认是 `build/script-bundle-0.0.1`；重复构建请指定新目录，脚本不会覆盖已有输出：
 
 ```sh
-TTYD_BINARY=/path/to/linux-arm64/ttyd \
-SPEEDTEST_BINARY=/path/to/linux-arm64/speedtest \
-VERSION=0.1.0 PRIVATE_KEY=/secure/private.hex PUBLIC_KEY=release-public-key.hex \
-  ./scripts/make-release.sh
+./scripts/package-script.sh build/script-bundle-test2
 ```
 
-They are preserved across later core-only updates. Their licenses must be
-added to the release's third-party notices by the distributor.
+本地包包含可独立运行的 `install-adb.sh`、Linux ARM64 主程序、设备服务脚本、许可证、构建标识和 `SHA256SUMS`。整个文件夹可携带使用，不依赖仓库内的其他脚本。不要求创建签名密钥或发布远端版本。校验用于确认本地包在传输后内容完整，**不是第三方发布者身份认证**；只使用自己构建或已信任的包。旧签名包若带 `manifest.json`，还会执行其已有签名校验。
+
+校验覆盖全部常规文件，拒绝额外文件、缺项、重复项、路径越界及符号链接。设备首先运行电脑端随安装器携带的控制脚本，校验通过后才启动包内程序。
+
+## 安装与升级
+
+```sh
+# 预览；不会连接设备
+./installer/install-adb.sh --bundle build/script-bundle-0.0.1
+
+# 执行；多设备时加 --serial SERIAL
+./installer/install-adb.sh --execute --bundle build/script-bundle-0.0.1
+```
+
+安装完成后通过设备的 `2433` 端口访问候选版。原版端口继续保留。电脑端对每条远端 Shell 命令读取明确的结束状态，兼容会把远端失败返回为本地成功的旧 adbd；缺失结束状态按传输失败处理。设备服务优先用 BusyBox `start-stop-daemon` 脱离安装会话并重新打开日志，其他主机回退到 `nohup`，不会依赖 ADB 会话存活。
+
+再次运行安装命令即升级。先检查包、权限和空间，再停服务并等待退出，复制自身数据，轮换目录，核对新进程的健康标识，最后启用自启；失败恢复此前的候选版本。目录中不存在本工具的归属标记时拒绝覆盖。
+
+可选：`--port 2433`、`--ttyd-port 1147`、`--store-port 2341`、`--no-autostart`。默认无需指定。运行参数保存为安装目录下的 `.ufi-runtime` 数据文件；正常开机不依赖安装时的临时环境变量。可用其他独立 `--root DIR`，但整个路径必须规范且不与原版目录重叠。
+
+## 卸载和恢复
+
+```sh
+# 默认卸载：停服务、恢复自启文件，将当前程序和数据保存到 .uninstalled
+./installer/install-adb.sh --execute --uninstall
+
+# 仅停用并去掉自启，保留活动目录
+./installer/install-adb.sh --execute --uninstall --keep-data
+
+# 显式彻底清理本工具及其备份，不删除原版目录
+./installer/install-adb.sh --execute --uninstall --purge
+
+# 恢复此前候选版本；没有 .previous 时恢复 .uninstalled
+./installer/install-adb.sh --execute --uninstall --restore
+```
+
+默认卸载保存当前数据；不覆盖已有 `.uninstalled`，避免丢掉唯一备份。`--restore` 将被替换的当前树保留为 `.restore-reserve`，恢复版本不能启动时放回当前版本。这里恢复的是本工具的候选版本，不是覆盖/还原原厂固件。
+
+上传暂存目录使用匹配安装根目录的归属标记；未知目录不覆盖、不递归清理。卸载不需要设备端仍存在新版控制脚本，电脑会上传当前控制器；重复卸载允许保留既有备份。
+
+## 中断处理
+
+- 普通失败、校验失败、空间不足、候选退出/占用端口、复制/轮换失败和可捕获信号有离线测试。
+- 操作使用 `.lifecycle-lock` 防止并发。强制断电/kill -9 后可能留下锁；脚本拒绝继续，不会猜测并删除。
+- 人工恢复前，先确认没有仍在执行的安装/卸载进程，检查锁中的 owner 和 `.next`、`.previous`、`.boot-transaction`、`.ufi-tools-pending`。保存这些目录；仅在明确原操作已结束后移除旧锁，再使用外部脚本的 `--restore`。无法确定归属时保持原状。
+- 如果活动目录已不存在，不能指望该目录内的开机脚本自行恢复，应使用电脑端控制器。
+- 这不是掉电一致性或整机分区恢复保证；相关实机验证仍在第 6 阶段。
+
+## 离线检查
+
+```sh
+make test
+make lint
+make installer-test
+go build -buildvcs=false -o /tmp/ufi-host ./cmd/ufi-tools-u60pro
+python3 installer/test-service-smoke.py /tmp/ufi-host
+```
+
+涵盖临时目录事务、连续升级、模拟旧进程隔离、无环境变量的启动、外来 PID、校验错误、空间不足、实际端口冲突、数据保留、恢复失败、启动文件/符号链接/权限、用户后续修改、挂载与路径保护、ADB状态诊断及执行生成的传输命令。测试不使用真实 ADB或真实U60；真实进程测试只用模拟设备后端及loopback。生产脚本不依赖Python；Python仅用于主机测试。
+
+OTA 调用链、原版配置/schema迁移、逐插件运行和清理并不因安装包通过而完成，继续按主计划第3—5阶段推进。现有OTA生成的stage需要适配完整清单及独立目录布局后才能纳入脚本更新验收。

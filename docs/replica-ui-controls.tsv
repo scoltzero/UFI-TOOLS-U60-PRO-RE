@@ -1,0 +1,125 @@
+id	tag	control_id	i18n_key	reference_location	step	implementation_evidence	acceptance	parity
+U001	button	CLEAR	login_btn	research-inputs/frontend-0.3.2/index.html:133	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U002	button	CHANGETOKEN	change_token	research-inputs/frontend-0.3.2/index.html:137	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U003	button	CHANGEPWD	change_password	research-inputs/frontend-0.3.2/index.html:141	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U004	button	REBOOT	reboot	research-inputs/frontend-0.3.2/index.html:145	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U005	button	SCHEDULE_REBOOT	schedule_reboot	research-inputs/frontend-0.3.2/index.html:149	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U006	button	SHUTDOWN	shutdown	research-inputs/frontend-0.3.2/index.html:153	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U007	button	BG_SETTING	bg_setting	research-inputs/frontend-0.3.2/index.html:157	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U008	button	PLUGIN_SETTING	plugin_setting	research-inputs/frontend-0.3.2/index.html:161	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U009	button	SMS	sms	research-inputs/frontend-0.3.2/index.html:169	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U010	button	DataManagement	data_mgmt	research-inputs/frontend-0.3.2/index.html:173	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U011	button	DataUsageHistory	data_usage_history_btn	research-inputs/frontend-0.3.2/index.html:175	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U012	button	SpeedTestBtn	speed_test	research-inputs/frontend-0.3.2/index.html:179	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U013	button	CellularSpeedTestBtn	cellular_speed_test	research-inputs/frontend-0.3.2/index.html:183	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U014	button	ClientManagement	client_mgmt	research-inputs/frontend-0.3.2/index.html:187	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U015	button	WIFIManagement	wifi_mgmt	research-inputs/frontend-0.3.2/index.html:189	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U016	button	LANManagement	lan_mgmt	research-inputs/frontend-0.3.2/index.html:191	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U017	button	CECULLAR	cellular	research-inputs/frontend-0.3.2/index.html:193	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U018	button	NFC	nfc	research-inputs/frontend-0.3.2/index.html:197	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U019	button	ROAM	network_roam	research-inputs/frontend-0.3.2/index.html:201	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U020	button	smsForward	sms_forward	research-inputs/frontend-0.3.2/index.html:205	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U021	button	ScheduledTaskManagement	scheduled_task	research-inputs/frontend-0.3.2/index.html:209	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U022	button	APNManagement	apn_setting	research-inputs/frontend-0.3.2/index.html:213	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U023	button	USBStatusManagement	usb_status	research-inputs/frontend-0.3.2/index.html:217	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U024	button	ADBToggle	adb	research-inputs/frontend-0.3.2/index.html:221	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U025	button	OTA	ota	research-inputs/frontend-0.3.2/index.html:225	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U026	select	SLEEP_TIME		research-inputs/frontend-0.3.2/index.html:231	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U027	select	NET_TYPE		research-inputs/frontend-0.3.2/index.html:253	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U028	select	SIM_CARD_TYPE		research-inputs/frontend-0.3.2/index.html:271	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U029	select	SIM_CARD_TYPE_V50		research-inputs/frontend-0.3.2/index.html:283	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U030	select	LANG		research-inputs/frontend-0.3.2/index.html:299	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U031	button	DICTIONARY	manage_fields	research-inputs/frontend-0.3.2/index.html:417	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U032	select	refreshRateSelect		research-inputs/frontend-0.3.2/index.html:425	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U033	select	bandPlanSelect		research-inputs/frontend-0.3.2/index.html:554	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U034	button	bandInvertButton		research-inputs/frontend-0.3.2/index.html:571	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U035	button	bandActiveUndo		research-inputs/frontend-0.3.2/index.html:586	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U036	button	bandActiveSave		research-inputs/frontend-0.3.2/index.html:587	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U037	button	bandRestoreDefault		research-inputs/frontend-0.3.2/index.html:591	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U038	button	SELECT_CURRENT_CELL_BTN	select_current_cell	research-inputs/frontend-0.3.2/index.html:654	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U039	button	lkCellRefreshBtn	start_refresh	research-inputs/frontend-0.3.2/index.html:698	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U040	input	PCI		research-inputs/frontend-0.3.2/index.html:738	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U041	input	EARFCN		research-inputs/frontend-0.3.2/index.html:748	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U042	input	CELL_BAND		research-inputs/frontend-0.3.2/index.html:758	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U043	input	TOKEN		research-inputs/frontend-0.3.2/index.html:817	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U044	input	PWDINPUT		research-inputs/frontend-0.3.2/index.html:849	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U045	input	loginRememberMe		research-inputs/frontend-0.3.2/index.html:879	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U046	input	PhoneInput		research-inputs/frontend-0.3.2/index.html:907	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U047	input	SMSInput		research-inputs/frontend-0.3.2/index.html:925	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U048	input	for_data		research-inputs/frontend-0.3.2/index.html:1399	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U049	input	start_time_data_usage_history		research-inputs/frontend-0.3.2/index.html:1533	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U050	input	end_time_data_usage_history		research-inputs/frontend-0.3.2/index.html:1543	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U051	input	wifiPwd2g		research-inputs/frontend-0.3.2/index.html:1713	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U052	input	wifiPwd5g		research-inputs/frontend-0.3.2/index.html:1845	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U053	select	NFC_WIFI_AP		research-inputs/frontend-0.3.2/index.html:1959	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U054	input	enableDHCP		research-inputs/frontend-0.3.2/index.html:2069	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U055	textarea	taskAction		research-inputs/frontend-0.3.2/index.html:2277	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U056	input	isCloudSync		research-inputs/frontend-0.3.2/index.html:2393	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U057	input	isCheckedBG		research-inputs/frontend-0.3.2/index.html:2409	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U058	input	BG_INPUT		research-inputs/frontend-0.3.2/index.html:2419	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U059	input	fileUploader		research-inputs/frontend-0.3.2/index.html:2427	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U060	input	blurSwitch		research-inputs/frontend-0.3.2/index.html:2455	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U061	input	overlaySwitch		research-inputs/frontend-0.3.2/index.html:2467	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U062	input	textColorEl		research-inputs/frontend-0.3.2/index.html:2477	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U063	input	colorEl		research-inputs/frontend-0.3.2/index.html:2489	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U064	input	saturationEl		research-inputs/frontend-0.3.2/index.html:2493	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U065	input	brightEl		research-inputs/frontend-0.3.2/index.html:2497	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U066	input	opacityEl		research-inputs/frontend-0.3.2/index.html:2505	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U067	input	pluginFileInput		research-inputs/frontend-0.3.2/index.html:2583	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U068	button	plugin_store_btn	plugin_store	research-inputs/frontend-0.3.2/index.html:2595	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U069	textarea	custom_head		research-inputs/frontend-0.3.2/index.html:2621	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U070	button	plugin_update_all_btn	plugin_update_all_btn	research-inputs/frontend-0.3.2/index.html:2667	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U071	button	plugin_store_submit_btn	submit_plugin	research-inputs/frontend-0.3.2/index.html:2671	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U072	input	pluginSearchInput		research-inputs/frontend-0.3.2/index.html:2695	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U073	button	pluginSearchResetBtn	plugin_search_reset_btn	research-inputs/frontend-0.3.2/index.html:2703	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U074	button	pluginSearchBtn	plugin_search_btn	research-inputs/frontend-0.3.2/index.html:2707	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U075	button	plugin_store_prev_page	prev_page	research-inputs/frontend-0.3.2/index.html:2735	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U076	button	plugin_store_next_page	next_page	research-inputs/frontend-0.3.2/index.html:2739	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U077	button	plugin_store_close_btn	close_btn	research-inputs/frontend-0.3.2/index.html:2743	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U078	button	submitEditSinglePlugin	submit_btn	research-inputs/frontend-0.3.2/index.html:2785	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U079	input	SCHEDULE_ENABLED		research-inputs/frontend-0.3.2/index.html:2815	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U080	input	SCHEDULE_TIME		research-inputs/frontend-0.3.2/index.html:2825	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U081	input	ckSize		research-inputs/frontend-0.3.2/index.html:3011	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U082	button	startSpeedBtn	speedtest_start_btn	research-inputs/frontend-0.3.2/index.html:3027	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U083	button	loopMode	speedtest_loop_btn	research-inputs/frontend-0.3.2/index.html:3029	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U084	input	CellularTestUrl		research-inputs/frontend-0.3.2/index.html:3055	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U085	button	startSpeedBtn	speedtest_start_btn	research-inputs/frontend-0.3.2/index.html:3083	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U086	button	loopMode	speedtest_loop_btn	research-inputs/frontend-0.3.2/index.html:3087	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U087	button	doUpdate	btn_update	research-inputs/frontend-0.3.2/index.html:3165	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U088	button	downloadAPK	btn_download	research-inputs/frontend-0.3.2/index.html:3167	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U089	button	closeUpdateBtn	close_btn	research-inputs/frontend-0.3.2/index.html:3169	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U090	button	smtpForwardBtn	smtp_method	research-inputs/frontend-0.3.2/index.html:3201	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U091	button	curlForwardBtn	curl_method	research-inputs/frontend-0.3.2/index.html:3205	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U092	button	dingtalkForwardBtn	dingtalk_method	research-inputs/frontend-0.3.2/index.html:3209	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U093	button	sms_btn	sms_phone_method	research-inputs/frontend-0.3.2/index.html:3213	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U094	button	forward_method_setting_btn	forward_method_setting_btn	research-inputs/frontend-0.3.2/index.html:3239	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U095	button	forward_nickname_setting_btn	forward_nickname_setting_btn	research-inputs/frontend-0.3.2/index.html:3243	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U096	input	smtp_host		research-inputs/frontend-0.3.2/index.html:3279	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U097	input	smtp_port		research-inputs/frontend-0.3.2/index.html:3295	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U098	input	smtp_username		research-inputs/frontend-0.3.2/index.html:3311	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U099	input	smtp_password		research-inputs/frontend-0.3.2/index.html:3327	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U100	input	smtp_to		research-inputs/frontend-0.3.2/index.html:3343	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U101	textarea	curl_text		research-inputs/frontend-0.3.2/index.html:3453	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U102	input	dingtalk_webhook		research-inputs/frontend-0.3.2/index.html:3509	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U103	input	dingtalk_secret		research-inputs/frontend-0.3.2/index.html:3529	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U104	textarea	sms_to_phone		research-inputs/frontend-0.3.2/index.html:3585	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U105	input	autoAPNMode		research-inputs/frontend-0.3.2/index.html:3663	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U106	input	apnMode		research-inputs/frontend-0.3.2/index.html:3669	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U107	select	autoProfile		research-inputs/frontend-0.3.2/index.html:3683	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U108	select	manualProfile		research-inputs/frontend-0.3.2/index.html:3709	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U109	button	addAPNProfile	add	research-inputs/frontend-0.3.2/index.html:3719	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U110	button	editAPNProfile	edit	research-inputs/frontend-0.3.2/index.html:3721	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U111	button	delAPNProfile	del	research-inputs/frontend-0.3.2/index.html:3723	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U112	input	TTYD_TOGGLE		research-inputs/frontend-0.3.2/index.html:3945	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U113	input	LOGIN_TOKEN_TOGGLE		research-inputs/frontend-0.3.2/index.html:3960	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U114	input	TTYD_INPUT		research-inputs/frontend-0.3.2/index.html:3984	4.1—4.4；插件部分5.1—5.4	同名控件存在，交互未验收	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U115	input	LOG_TOGGLE		research-inputs/frontend-0.3.2/index.html:4002	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U116	input	LOG_CLEAR_ENABLED		research-inputs/frontend-0.3.2/index.html:4012	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U117	input	LOG_CLEAR_INTERVAL		research-inputs/frontend-0.3.2/index.html:4021	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U118	button	QCI_AMBR_CLEAR_BUTTON	qci_ambr_cache_clear	research-inputs/frontend-0.3.2/index.html:4036	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U119	input	AUTO_UPDATE_ENABLED		research-inputs/frontend-0.3.2/index.html:4062	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U120	input	AUTO_UPDATE_IDLE_MIN		research-inputs/frontend-0.3.2/index.html:4071	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U121	textarea	HOSTS_TEXT		research-inputs/frontend-0.3.2/index.html:4104	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U122	input	TIMEFIX_SERVER		research-inputs/frontend-0.3.2/index.html:4170	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U123	input	TIMEFIX_CALIBRATION		research-inputs/frontend-0.3.2/index.html:4178	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收
+U124	input	TIMEFIX_BOOT_SYNC		research-inputs/frontend-0.3.2/index.html:4190	4.1—4.4；插件部分5.1—5.4	候选未定位同名控件，需核对替代入口	U：显示条件/绑定动作/成功失败/刷新重启/返回导航	未验收

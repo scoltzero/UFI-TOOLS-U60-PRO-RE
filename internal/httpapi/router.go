@@ -19,11 +19,13 @@ import (
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/config"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/hostsfile"
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/logfile"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/plugins"
 	processrunner "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/process"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/store"
 	updateverify "github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/update"
 	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/webui"
+	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/workers"
 )
 
 type Dependencies struct {
@@ -32,11 +34,15 @@ type Dependencies struct {
 	Device  device.Device
 	Logger  *slog.Logger
 	Version string
-	Catalog *catalog.Client
-	Runner  processrunner.Runner
-	TTYD    *processrunner.Supervisor
-	Updater *updateverify.Manager
-	Hosts   *hostsfile.Manager
+	// HealthInstance identifies this process start, not a credential or device ID.
+	HealthInstance   string
+	HealthDeployment string
+	Catalog          *catalog.Client
+	Runner           processrunner.Runner
+	TTYD             *processrunner.Supervisor
+	Updater          *updateverify.Manager
+	Hosts            *hostsfile.Manager
+	Logs             *logfile.File
 }
 
 type handler struct {
@@ -51,13 +57,19 @@ type envelope struct {
 }
 
 func New(deps Dependencies) http.Handler {
-	h := &handler{deps: deps, auth: authenticator{cfg: deps.Config}}
+	h := &handler{deps: deps, auth: authenticator{cfg: deps.Config, store: deps.Store}}
 	public := http.NewServeMux()
 	public.HandleFunc("GET /healthz", h.health)
 	public.HandleFunc("GET /api/version", h.version)
 	public.HandleFunc("GET /api/need_token", h.needToken)
 
 	protected := http.NewServeMux()
+	protected.HandleFunc("GET /api/capabilities", h.capabilities)
+	protected.HandleFunc("POST /api/usb/mode", h.usbMode)
+	protected.HandleFunc("GET /api/logs", h.logs)
+	protected.HandleFunc("DELETE /api/logs", h.logs)
+	protected.HandleFunc("POST /api/terminal/session", h.terminalSession)
+	protected.HandleFunc("GET /api/terminal/", h.terminalProxy)
 	protected.HandleFunc("GET /api/config", h.getConfig)
 	protected.HandleFunc("POST /api/config", h.setConfig)
 	protected.HandleFunc("GET /api/device/status", h.deviceStatus)
@@ -121,7 +133,14 @@ func (h *handler) health(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, envelope{Code: 503, Message: "storage unavailable"})
 		return
 	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]bool{"ok": true}})
+	data := map[string]any{"ok": true}
+	if h.deps.HealthInstance != "" {
+		data["instance"] = h.deps.HealthInstance
+	}
+	if h.deps.HealthDeployment != "" {
+		data["deployment"] = h.deps.HealthDeployment
+	}
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: data})
 }
 
 func (h *handler) version(w http.ResponseWriter, _ *http.Request) {
@@ -130,11 +149,21 @@ func (h *handler) version(w http.ResponseWriter, _ *http.Request) {
 	}})
 }
 
-func (h *handler) needToken(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"need_token": h.auth.required()})
+func (h *handler) needToken(w http.ResponseWriter, r *http.Request) {
+	auth, err := h.auth.current(r.Context())
+	if err != nil {
+		writeLegacyError(w, http.StatusServiceUnavailable, "authentication storage unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"need_token": auth.required()})
 }
 
 func (h *handler) getConfig(w http.ResponseWriter, r *http.Request) {
+	resourceServer, err := h.resourceServer(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "read configuration"})
+		return
+	}
 	nickname, err := h.deps.Store.Get(r.Context(), "config", "nickname")
 	if errors.Is(err, sql.ErrNoRows) {
 		nickname = h.deps.Config.Nickname
@@ -145,7 +174,7 @@ func (h *handler) getConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{
 		"nickname":             nickname,
 		"plugin_server_url":    h.deps.Config.PluginServerURL,
-		"resource_server_url":  h.deps.Config.ResourceServerURL,
+		"resource_server_url":  resourceServer,
 		"legacy_auth_enabled":  h.deps.Config.LegacyAuthEnabled,
 		"legacy_shell_enabled": h.deps.Config.LegacyShellEnabled,
 	}})
@@ -212,8 +241,8 @@ func (h *handler) timeStatus(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *handler) timeSync(w http.ResponseWriter, r *http.Request) {
-	if h.deps.Config.DeviceBackend == "simulator" {
-		writeJSON(w, http.StatusConflict, envelope{Code: 409, Message: "time mutation is disabled in simulator mode"})
+	if !h.deps.Config.PrivilegedCompat || h.deps.Config.DeviceBackend != "u60-local" {
+		writeJSON(w, http.StatusConflict, envelope{Code: 409, Message: "time mutation requires privileged local backend"})
 		return
 	}
 	if h.deps.Runner == nil {
@@ -234,6 +263,10 @@ func (h *handler) timeSync(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]int64{"unix": request.Unix}})
 }
+
+// DevUI's support-script installer submits multiline commands larger than 4 KiB.
+// Keep a bounded command size shared by the existing shell compatibility routes.
+const maxShellCommandSize = 64 << 10
 
 func (h *handler) runShell(w http.ResponseWriter, r *http.Request) {
 	if !h.deps.Config.LegacyShellEnabled {
@@ -256,12 +289,23 @@ func (h *handler) runShell(w http.ResponseWriter, r *http.Request) {
 	if command == "" {
 		command = request.Cmd
 	}
-	result, err := h.deps.Runner.Run(r.Context(), command)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "execute command"})
+	if strings.TrimSpace(command) == "" || len(command) > maxShellCommandSize {
+		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid shell command"})
 		return
 	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: result})
+	result, err := h.deps.Runner.Run(r.Context(), command)
+	status, code := http.StatusOK, 0
+	message := ""
+	if err != nil || result.ExitCode != 0 || result.TimedOut {
+		status, code = http.StatusInternalServerError, 500
+		message = "execute command failed"
+	}
+	// Preserve the candidate envelope and provide the success/content fields
+	// consumed by the existing DevUI manager's standalone run_shell shim.
+	writeJSON(w, status, map[string]any{
+		"code": code, "message": message, "data": result,
+		"success": code == 0, "content": result.Output,
+	})
 }
 
 func (h *handler) getCustomHead(w http.ResponseWriter, r *http.Request) {
@@ -368,11 +412,11 @@ func (h *handler) installCatalogPlugin(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "plugin download or integrity check failed"})
 		return
 	}
-	key := "plugin." + item.ID
-	if err := h.deps.Store.Set(r.Context(), "kv", key, string(data)); err != nil {
-		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save plugin"})
+	if err := h.saveCatalogPlugin(r, item, data); err != nil {
+		writeJSON(w, http.StatusConflict, envelope{Code: 409, Message: "save active plugin: " + err.Error()})
 		return
 	}
+
 	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: item})
 }
 
@@ -428,7 +472,7 @@ func (h *handler) listSchedulers(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "list schedulers"})
 		return
 	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: items})
+	writeJSON(w, http.StatusOK, map[string]any{"code": 0, "data": items, "active": h.deps.Config.WorkersEnabled})
 }
 
 func (h *handler) setScheduler(w http.ResponseWriter, r *http.Request) {
@@ -440,11 +484,16 @@ func (h *handler) setScheduler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "id and data are required"})
 		return
 	}
+	var schedule workers.Schedule
+	if json.Unmarshal(request.Data, &schedule) != nil || len(request.ID) > 128 || schedule.NextUnix <= 0 || schedule.IntervalSeconds < 0 || schedule.IntervalSeconds > 366*86400 || (schedule.Action.Type != "goform_set" && schedule.Action.Type != "goform_command" && schedule.Action.Type != "forward_status") || schedule.Action.Type == "goform_set" && schedule.Action.Key == "" || schedule.Action.Type == "goform_command" && schedule.Action.Params["goformId"] == "" {
+		writeJSON(w, 400, envelope{Code: 400, Message: "valid schedule time and action required"})
+		return
+	}
 	if err := h.deps.Store.SetScheduler(r.Context(), request.ID, string(request.Data)); err != nil {
 		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "save scheduler"})
 		return
 	}
-	writeJSON(w, http.StatusOK, envelope{Code: 0})
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]any{"active": h.deps.Config.WorkersEnabled}})
 }
 
 func (h *handler) deleteScheduler(w http.ResponseWriter, r *http.Request) {
@@ -548,7 +597,7 @@ func (h *handler) recordCellular(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid cellular point"})
 		return
 	}
-	if err := h.deps.Store.RecordCellular(r.Context(), request.Timestamp, request.Total); err != nil {
+	if err := h.deps.Store.RecordUsage(r.Context(), request.Timestamp, request.Total); err != nil {
 		writeJSON(w, http.StatusInternalServerError, envelope{Code: 500, Message: "record cellular point"})
 		return
 	}
@@ -595,7 +644,8 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; object-src 'none'; frame-ancestors 'none'")
+		// The embedded legacy UI uses inline styles and HTML event handlers.
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; object-src 'none'; frame-ancestors 'none'")
 		next.ServeHTTP(w, r)
 	})
 }

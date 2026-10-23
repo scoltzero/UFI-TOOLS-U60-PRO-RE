@@ -20,6 +20,7 @@
       <button data-tab="hosts-panel">Hosts</button>
       <button data-tab="plugins-panel">插件</button>
       <button data-tab="tasks-panel">调度</button>
+      <button data-tab="system-panel">系统与文件</button>
       <button data-tab="sms-panel">短信转发</button>
     </nav>
     <section id="device-panel" class="panel active">
@@ -40,7 +41,7 @@
     <section id="tasks-panel" class="panel">
       <h2>调度任务</h2>
       <input id="taskId" placeholder="任务 ID">
-      <textarea id="taskData" rows="7" spellcheck="false">{"enabled":true,"next_unix":0,"action":{"type":"goform_set","key":"example","value":"1"}}</textarea>
+      <textarea id="taskData" rows="7" spellcheck="false">{"enabled":true,"next_unix":0,"action":{"type":"goform_command","params":{"goformId":"DISCONNECT_NETWORK"}}}</textarea>
       <div class="actions"><button id="saveTask">保存任务</button><button id="loadTasks">刷新列表</button></div>
       <pre id="taskList"></pre>
     </section>
@@ -50,6 +51,20 @@
       <select id="smsMethod"><option>CURL</option><option>DINGTALK</option><option>SMTP</option><option>SMS</option></select>
       <textarea id="smsConfig" rows="8" spellcheck="false" placeholder='{"url":"https://example.invalid/hook","body":"{{sms-from}}: {{sms-body}}"}'></textarea>
       <div class="actions"><button id="saveSMS">保存转发配置</button></div>
+    </section>
+    <section id="system-panel" class="panel">
+      <h2>系统与文件</h2>
+      <p>候选统计按 UTC 记录；后台开关的实际运行状态在下方显示。</p>
+      <div class="actions"><button id="readRuntime">刷新后台与 USB 状态</button><button id="syncLocalTime">同步浏览器时间</button></div>
+      <label>后台任务 <select id="runtimeJob"><option value="time/config">NTP 时间同步</option><option value="auto_update/config">签名更新</option><option value="log_clear">定期日志清理</option></select></label>
+      <textarea id="runtimeConfig" rows="5" spellcheck="false">{"enabled":false,"interval_hours":24}</textarea>
+      <div class="actions"><button id="loadRuntime">读取已保存设置</button><button id="saveRuntime" disabled>保存后台设置</button></div>
+      <pre id="runtimeState"></pre>
+      <h3>USB 模式</h3><label>固件 mode <input id="firmwareUSBMode" placeholder="先查看 USB 状态，填写固件支持的 mode"></label><button id="setFirmwareUSBMode">应用 USB 模式</button>
+      <h3>候选日志</h3><button id="readLogs">查看日志</button><button id="clearLogs">清空候选日志</button><pre id="candidateLogs"></pre>
+      <h3>文件</h3><input id="candidateFile" type="file"><button id="uploadCandidateFile">上传至候选存储</button><button id="listCandidateFiles">刷新文件列表</button><div id="candidateFiles"></div>
+      <h3>本月用量校准</h3><label>累计字节数 <input id="calibratedBytes" type="number" min="0"></label><button id="calibrateUsage">保存校准</button>
+      <h3>独立签名更新</h3><button id="checkSignedUpdate">检查更新</button><button id="downloadSignedUpdate">下载并验证</button><button id="installSignedUpdate">安装已验证更新</button><pre id="signedUpdateState"></pre>
     </section>
     <div id="toast" role="status" aria-live="polite"></div>
   </main>

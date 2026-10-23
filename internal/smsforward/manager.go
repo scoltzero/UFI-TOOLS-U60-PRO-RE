@@ -413,7 +413,29 @@ func settingString(value string, keys ...string) string {
 
 func replace(template string, message Message) string {
 	if template == "" {
-		template = `{"body":"{{sms-body}}","from":"{{sms-from}}","time":"{{sms-time}}"}`
+		encoded, _ := json.Marshal(map[string]string{"body": message.Body, "from": message.From, "time": message.Date})
+		return string(encoded)
+	}
+	var parsed any
+	if json.Unmarshal([]byte(template), &parsed) == nil {
+		var walk func(any) any
+		walk = func(v any) any {
+			switch x := v.(type) {
+			case string:
+				return strings.NewReplacer("{{sms-body}}", message.Body, "{{sms-from}}", message.From, "{{sms-time}}", message.Date).Replace(x)
+			case map[string]any:
+				for k, item := range x {
+					x[k] = walk(item)
+				}
+			case []any:
+				for i, item := range x {
+					x[i] = walk(item)
+				}
+			}
+			return v
+		}
+		encoded, _ := json.Marshal(walk(parsed))
+		return string(encoded)
 	}
 	replacer := strings.NewReplacer("{{sms-body}}", message.Body, "{{sms-from}}", message.From, "{{sms-time}}", message.Date)
 	return replacer.Replace(template)
@@ -449,6 +471,8 @@ func first(item map[string]any, keys ...string) string {
 
 func toString(value any) string {
 	switch typed := value.(type) {
+	case nil:
+		return ""
 	case string:
 		return typed
 	case json.Number:

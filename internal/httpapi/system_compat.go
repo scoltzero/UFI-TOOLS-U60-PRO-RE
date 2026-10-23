@@ -13,8 +13,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/scoltzero/UFI-TOOLS-U60-PRO-RE/internal/device"
 )
 
 func (h *handler) systemStatus(command, field string) http.HandlerFunc {
@@ -33,44 +31,44 @@ func (h *handler) systemStatus(command, field string) http.HandlerFunc {
 }
 
 func (h *handler) setWakelock(w http.ResponseWriter, r *http.Request) {
+	if !h.deps.Config.PrivilegedCompat || h.deps.Config.DeviceBackend != "u60-local" {
+		writeLegacyError(w, 403, "wakelock requires privileged local backend")
+		return
+	}
 	if h.deps.Runner == nil {
 		writeJSON(w, http.StatusServiceUnavailable, envelope{Code: 503, Message: "system runner unavailable"})
 		return
 	}
 	var request struct {
-		Enabled bool `json:"enabled"`
+		Enabled         *bool `json:"enabled"`
+		WakelockEnabled *bool `json:"wakelock_enabled"`
 	}
 	if err := decodeJSON(r, &request); err != nil {
 		writeJSON(w, http.StatusBadRequest, envelope{Code: 400, Message: "invalid wakelock setting"})
 		return
 	}
-	command := "printf ufi-tools > /sys/power/wake_unlock"
-	if request.Enabled {
-		command = "printf ufi-tools > /sys/power/wake_lock"
+	if request.Enabled == nil {
+		request.Enabled = request.WakelockEnabled
+	}
+	if request.Enabled == nil {
+		writeLegacyError(w, 400, "enabled is required")
+		return
+	}
+	command := "printf ufi-tools-re > /sys/power/wake_unlock"
+	if *request.Enabled {
+		command = "printf ufi-tools-re > /sys/power/wake_lock"
 	}
 	result, err := h.deps.Runner.Run(r.Context(), command)
 	if err != nil || result.ExitCode != 0 {
 		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "change wakelock state", Data: result})
 		return
 	}
-	_ = h.deps.Store.Set(r.Context(), "kv", "wakelock_enabled", strings.ToLower(strings.TrimSpace(toString(request.Enabled))))
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]bool{"enabled": request.Enabled}})
+	_ = h.deps.Store.Set(r.Context(), "kv", "wakelock_enabled", strings.ToLower(strings.TrimSpace(toString(*request.Enabled))))
+	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]bool{"enabled": *request.Enabled}})
 }
 
 func (h *handler) wifiQRCodeData(w http.ResponseWriter, r *http.Request) {
-	values, err := device.GetMany(r.Context(), h.deps.Device, []string{"SSID1", "wifi_ssid", "KeyPassphrase", "wifi_password", "AuthMode"})
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, envelope{Code: 502, Message: "read Wi-Fi configuration"})
-		return
-	}
-	ssid := firstValue(values, "SSID1", "wifi_ssid")
-	password := firstValue(values, "KeyPassphrase", "wifi_password")
-	auth := firstValue(values, "AuthMode")
-	if auth == "" {
-		auth = "WPA"
-	}
-	payload := "WIFI:T:" + escapeWiFi(auth) + ";S:" + escapeWiFi(ssid) + ";P:" + escapeWiFi(password) + ";;"
-	writeJSON(w, http.StatusOK, envelope{Code: 0, Data: map[string]string{"ssid": ssid, "auth": auth, "payload": payload}})
+	writeLegacyError(w, 422, "saved Wi-Fi passphrases are not exposed; use the Wi-Fi form to set a new passphrase")
 }
 
 func (h *handler) speedtest(w http.ResponseWriter, r *http.Request) {

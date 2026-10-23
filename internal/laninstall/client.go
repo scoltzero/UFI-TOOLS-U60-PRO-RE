@@ -49,10 +49,13 @@ func NewClient(baseURL, session string, client *http.Client) (*Client, error) {
 		return nil, errors.New("UBUS session must be a 32-character hexadecimal value")
 	}
 	if client == nil {
-		client = &http.Client{Timeout: 45 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		}}
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.Proxy = nil
+		client = &http.Client{Timeout: 45 * time.Second, Transport: transport}
 	}
+	copyClient := *client
+	copyClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	client = &copyClient
 	return &Client{base: base, session: session, http: client}, nil
 }
 
@@ -105,6 +108,9 @@ func (c *Client) Backup(ctx context.Context) ([]byte, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.resolve("/backup/back_parameter"), nil)
 	if err != nil {
 		return nil, err
+	}
+	if c.session != defaultSession {
+		request.AddCookie(&http.Cookie{Name: "webtoken", Value: c.session})
 	}
 	response, err := c.http.Do(request)
 	if err != nil {

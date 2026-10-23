@@ -287,3 +287,10 @@ func (s *Store) StableID(ctx context.Context, key string) (string, error) {
 	}
 	return value, nil
 }
+
+// SeedDeviceToken provisions a freshly generated installer token without ever
+// replacing an existing or user-rotated authentication token.
+func (s *Store) SeedDeviceToken(ctx context.Context, value string) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO config(key,value) VALUES('device_token',?) ON CONFLICT(key) DO NOTHING`, value)
+	return err
+}

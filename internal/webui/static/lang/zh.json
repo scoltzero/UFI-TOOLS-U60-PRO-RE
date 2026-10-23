@@ -263,8 +263,10 @@
     "client_mgmt_fetch_error": "获取数据失败，请检查网络连接",
     "wifi_title": "WIFI设置",
     "wifi_option_off": "WIFI:关闭",
+    "wifi_option_on_preserve": "WIFI:开启（保留频段）",
     "wifi_option_24g": "WIFI:2.4G",
     "wifi_option_5g": "WIFI:5G",
+    "wifi_option_dual_current": "WIFI:双频（当前状态）",
     "wifi_hint_no_submit": "此选项即时更改无需确认。",
     "wifi_ssid_label": "SSID：",
     "wifi_ssid_placeholder": "请输入SSID",
@@ -740,8 +742,8 @@
     "device_usb_exp": "设备模式（连接电脑）",
     "weak_token_detected": "检测到您使用了弱口令，您必须更改口令以保障设备安全。",
     "change_token_now": "立即更改",
-    "token_change_notice": "口令最短为8位，至少包含字母和数字",
-    "toast_token_invalid": "口令至少包含字母和数字!",
+    "token_change_notice": "使用 8～256 位英文、数字或符号，不含空格",
+    "toast_token_invalid": "口令需为 8～256 位英文、数字或符号，不能包含空格",
     "toast_token_too_short": "口令至少需要8位!",
     "three_days_later": "推迟三天",
     "three_days_later_info": "为了确保用户修改口令，三天后会继续提示",
@@ -857,5 +859,9 @@
     "change_pass_tip2": "当前UFI-TOOLS保存的密码为：",
     "plugin_override_mod": "插件存在，已覆盖安装",
     "export": "导出",
-    "reinstall": "重新安装"
+    "reinstall": "重新安装",
+    "candidate_login_title": "登录 UFI-TOOLS",
+    "candidate_login_note": "请输入本程序安装时生成的口令，无需原厂后台密码。",
+    "candidate_token_label": "本程序口令",
+    "candidate_token_placeholder": "输入安装时生成的口令"
 }

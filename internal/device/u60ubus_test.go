@@ -17,7 +17,7 @@ func TestU60UBUSStatus(t *testing.T) {
 		v := map[string]any{}
 		switch c[0].Params[2].(string) {
 		case "get_device_info":
-			v = map[string]any{"wa_inner_version": "U60", "modem_imei": "secret", "device_uptime": 12}
+			v = map[string]any{"device_model": "MU5250", "wa_inner_version": "firmware-version", "modem_imei": "secret", "device_uptime": 12}
 		case "nwinfo_get_netinfo":
 			v = map[string]any{"network_type": "NR5G-SA", "signalbar": 4, "simcard_roam": 0}
 		case "get_sim_info_before":
@@ -31,7 +31,7 @@ func TestU60UBUSStatus(t *testing.T) {
 		t.Fatal(e)
 	}
 	v, e := d.Status(t.Context())
-	if e != nil || v.Model != "U60" || v.NetworkType != "NR5G-SA" || v.Signal != 4 || !v.Connected {
+	if e != nil || v.Model != "MU5250" || v.NetworkType != "NR5G-SA" || v.Signal != 4 || !v.Connected {
 		t.Fatalf("status=%#v err=%v", v, e)
 	}
 }
