@@ -28,3 +28,11 @@ jobs:
         run: file bin/ufi-tools-u60pro-linux-arm64
       - name: Test transactional installer rollback
         run: make installer-test
+      - name: Build one-click installation package
+        run: |
+          VERSION=0.0.1 ./scripts/package-script.sh build/ufi-tools-u60pro-beta
+          tar -czf build/UFI-TOOLS-U60-Pro-beta.tar.gz -C build ufi-tools-u60pro-beta
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UFI-TOOLS-U60-Pro-beta
+          path: build/UFI-TOOLS-U60-Pro-beta.tar.gz

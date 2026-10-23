@@ -17,11 +17,15 @@ with tempfile.TemporaryDirectory(prefix='ufi-adb-transport-') as td:
     bundle.mkdir()
     tools.mkdir()
     shutil.copy2(project/'installer/bundle/service.sh', bundle/'service.sh')
+    for name in ('install.sh', 'install.command'):
+        shutil.copy2(project/name, bundle/name)
+    shutil.copy2(project/'installer/install-adb.sh', bundle/'install-adb.sh')
     (bundle/'ufi-tools-u60pro').write_text('#!/bin/sh\ntrap "exit 0" TERM\nwhile :; do sleep 1; done\n')
     (bundle/'ufi-tools-u60pro').chmod(0o755)
     (bundle/'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in sorted(bundle.iterdir())))
     (tools/'adb').write_text(f'#!{sys.executable}\n'+'''
 import os, pathlib, shutil, subprocess, sys, shlex, re
+with open(os.environ['FAKE_ADB_LOG'],'a') as log: log.write('called\\n')
 args=sys.argv[1:]
 if args[0]=='-s': args=args[2:]
 if args[0]=='get-state': print('device')
@@ -54,13 +58,23 @@ printf '{"data":{"ok":true,"instance":"%s"}}' "$(cat "$UFI_INSTALL_ROOT/.ufi-hea
     for name in ('adb','wget'):
         (tools/name).chmod(0o755)
     env = {k:v for k,v in os.environ.items() if not k.startswith('UFI_')}
-    env.update(ADB=str(tools/'adb'), PATH=str(tools)+os.pathsep+env['PATH'], UFI_HEALTH_ATTEMPTS='1', UFI_STOP_ATTEMPTS='3')
+    env.update(ADB=str(tools/'adb'), PATH=str(tools)+os.pathsep+env['PATH'], UFI_HEALTH_ATTEMPTS='1', UFI_STOP_ATTEMPTS='3', FAKE_ADB_LOG=str(tmp/'adb-calls'))
     command = [str(project/'installer/install-adb.sh'),'--execute','--root',str(root),'--no-autostart']
     foreign = tmp/'user-files'
     foreign.mkdir()
     (foreign/'keep').write_text('original contents')
     try:
-        subprocess.run(command+['--bundle',str(bundle)],env=env,check=True,timeout=45)
+        entry = ['sh',str(bundle/'install.sh')]
+        target = ['--root',str(root),'--no-autostart']
+        subprocess.run(entry+['preview']+target,env=env,check=True,timeout=15)
+        rejected = subprocess.run(entry+['preview','--execute']+target,env=env,timeout=15)
+        assert rejected.returncode != 0
+        assert not (tmp/'adb-calls').exists(), 'preview contacted ADB'
+        assert not root.exists()
+        # A prebuilt package must never invoke a compiler.
+        (tools/'go').write_text('#!/bin/sh\nexit 91\n')
+        (tools/'go').chmod(0o755)
+        subprocess.run(entry+target,env=env,check=True,timeout=45)
         assert (root/'.ufi-runtime').is_file()
         assert not Path(str(root)+'.staging').exists()
         subprocess.run(command+['--bundle',str(bundle)],env=env,check=True,timeout=45)
@@ -76,7 +90,7 @@ printf '{"data":{"ok":true,"instance":"%s"}}' "$(cat "$UFI_INSTALL_ROOT/.ufi-hea
         assert unsafe.returncode != 0
         assert protected.read_text() == 'user-owned data'
         assert not linked_stage.exists()
-        subprocess.run(command+['--uninstall'],env=env,check=True,timeout=45)
+        subprocess.run(entry+['uninstall']+target,env=env,check=True,timeout=45)
         assert not root.exists()
         assert Path(str(root)+'.uninstalled/.ufi-tools-manifest').is_file()
         assert (foreign/'keep').read_text() == 'original contents'
